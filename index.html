@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#24408f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Groceries">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="src/style.css">
+  <script>
+    // Pre-paint theme bootstrap: set data-theme before the app JS runs to avoid a theme flash.
+    try {
+      var t = localStorage.getItem("glTheme") || "bluegold";
+      var auto = localStorage.getItem("glAutoDark") !== "0";
+      var darkSys = matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.theme = (auto && darkSys) ? "midnight" : t;
+    } catch (e) {}
+  </script>
+  <title>Our Grocery Lists</title>
+</head>
+<body>
+  <div id="status" role="status" hidden></div>
+  <div id="app"><p class="loading">Loading…</p></div>
+  <script type="module" src="src/main.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+    // If the app module never boots (offline / CDN unreachable), replace the silent hang with a message.
+    setTimeout(() => {
+      const el = document.querySelector("#app .loading");
+      if (el) el.textContent = "Can't reach the server — check your connection and reload.";
+    }, 6000);
+  </script>
+</body>
+</html>

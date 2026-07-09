@@ -1,0 +1,828 @@
+/* Grocery List App — token + [data-theme] multi-theme system.
+   Warm, friendly, rounded-card look. Mobile-first, safe-area aware, a11y.
+
+   Palette per theme lives ONLY in the [data-theme="…"] blocks below; every
+   other rule references the semantic tokens (--bg --card --tx --sub --border
+   --ac --ac2 --ontop). The only raw hex outside those blocks is the shared
+   danger colour, declared as a base token in :root (allowed). Shadows use
+   rgb()/rgba(). Active theme is set by the app via data-theme on <html>.
+
+   Checked-box contract (single source of truth — Task 6 renders NO glyph):
+     .box.on { background: var(--ac); }
+     .box.on::after { content: "✓"; color: var(--ontop); }
+   The ✓ is drawn solely here, so it can never double-draw. */
+
+/* ── Base tokens ─────────────────────────────────────────────────────── */
+:root {
+  /* Spacing scale (4-based) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space: var(--space-4); /* default screen padding */
+
+  /* Radii */
+  --r-card: 15px;
+  --r-ctl: 12px;
+  --r-pill: 999px;
+
+  /* Type — root font-size left at UA default so iOS Dynamic Type flows through */
+  --fs-body: 1.0625rem;   /* ~17px rows/body */
+  --fs-sub: 0.8125rem;    /* ~13px secondary */
+  --fs-title: 1.4rem;     /* ~22px screen title */
+  --fs-ctl: 1.0625rem;    /* controls/inputs */
+
+  --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Elevation */
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 2px 6px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 6px 24px rgb(0 0 0 / 0.18);
+
+  /* Motion */
+  --dur: 0.24s;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* Shared danger (delete). Consistent across themes; base token by design. */
+  --danger: #d64545;
+  --on-danger: #ffffff;
+
+  /* Sensible fallback palette so unstyled state is never invisible.
+     Overridden by every [data-theme] block. Mirrors the default (bluegold). */
+  --bg: #24408f;
+  --card: #2f4db0;
+  --tx: #efe9d2;
+  --sub: #aca375;
+  --border: #3f5cbd;
+  --ac: #cdb24a;
+  --ac2: #cdb24a;
+  --ontop: #1a2c66;
+}
+
+/* ── Theme palettes (exact hex, design spec §3.1) ────────────────────── */
+[data-theme="bluegold"] {
+  --bg: #24408f;
+  --card: #2f4db0;
+  --tx: #efe9d2;
+  --sub: #aca375;
+  --border: #3f5cbd;
+  --ac: #cdb24a;
+  --ac2: #cdb24a;
+  --ontop: #1a2c66;
+}
+[data-theme="terracotta"] {
+  --bg: #faf6ef;
+  --card: #ffffff;
+  --tx: #2c2a26;
+  --sub: #a99f8f;
+  --border: #e3dccb;
+  --ac: #e0803a;
+  --ac2: #e0803a;
+  --ontop: #ffffff;
+}
+[data-theme="green"] {
+  --bg: #faf6ef;
+  --card: #ffffff;
+  --tx: #2c2a26;
+  --sub: #a99f8f;
+  --border: #e3dccb;
+  --ac: #3f9d63;
+  --ac2: #3f9d63;
+  --ontop: #ffffff;
+}
+[data-theme="berry"] {
+  --bg: #faf6ef;
+  --card: #ffffff;
+  --tx: #2c2a26;
+  --sub: #a99f8f;
+  --border: #e3dccb;
+  --ac: #cf5a75;
+  --ac2: #cf5a75;
+  --ontop: #ffffff;
+}
+[data-theme="festive"] {
+  --bg: #f7f3ec;
+  --card: #ffffff;
+  --tx: #26312a;
+  --sub: #9aa79c;
+  --border: #e3e0d3;
+  --ac: #1f7a4d;
+  --ac2: #c0392b;
+  --ontop: #ffffff;
+}
+[data-theme="midnight"] {
+  --bg: #131a24;
+  --card: #1c2530;
+  --tx: #e9edf2;
+  --sub: #8a97a6;
+  --border: #2b3745;
+  --ac: #d4af37;
+  --ac2: #d4af37;
+  --ontop: #12161c;
+}
+[data-theme="teal"] {
+  --bg: #f2f7f6;
+  --card: #ffffff;
+  --tx: #21302e;
+  --sub: #93a4a1;
+  --border: #dde8e6;
+  --ac: #159b93;
+  --ac2: #159b93;
+  --ontop: #ffffff;
+}
+[data-theme="plumpeach"] {
+  --bg: #f8f4f6;
+  --card: #ffffff;
+  --tx: #2f2531;
+  --sub: #a495a0;
+  --border: #ece2e8;
+  --ac: #7b3f79;
+  --ac2: #ef9d6b;
+  --ontop: #ffffff;
+}
+
+/* ── Reset & shell ───────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--tx);
+  font-family: var(--font-stack);
+  font-size: var(--fs-body);
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.loading {
+  padding: var(--space-5);
+  color: var(--sub);
+  text-align: center;
+}
+
+/* Empty-state / muted helper text */
+.muted {
+  color: var(--sub);
+  text-align: center;
+  padding: var(--space-5) var(--space-4);
+  margin: 0;
+}
+
+/* Transient status pill (main.js #status) */
+#status {
+  position: fixed;
+  top: max(var(--space-3), env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--tx);
+  color: var(--bg);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sub);
+  box-shadow: var(--shadow-lg);
+  z-index: 60;
+  max-width: calc(100vw - 2 * var(--space-4));
+}
+#status[hidden] { display: none; }
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: max(var(--space-3), env(safe-area-inset-top)) var(--space-4) var(--space-3);
+  background: var(--bg);
+}
+
+.bar h1 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-title);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ac);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Text/glyph buttons living in the bar (back, sign out, gear, clear) */
+.bar button,
+.icon-btn {
+  min-height: 48px;
+  min-width: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  background: none;
+  border: none;
+  color: var(--ac);
+  font: inherit;
+  font-size: var(--fs-ctl);
+  cursor: pointer;
+  border-radius: var(--r-ctl);
+}
+.icon-btn { color: var(--tx); }
+.icon-btn.danger { color: var(--danger); }
+
+/* ── Scroll region for cards ─────────────────────────────────────────── */
+.list {
+  flex: 1;
+  padding: var(--space-2) 0 var(--space-2);
+}
+
+/* ── Card / row (also the swipe-to-delete scroll-snap container) ─────────
+   Expected markup (Task 6):
+     <div class="row">                        ← scroll-snap container
+       <div class="row-main"> … </div>        ← visible content (100% wide)
+       <button class="row-delete">Delete</button>  ← red panel, revealed on left-swipe
+     </div>
+   A row with only .row-main simply never scrolls (fine for the lists home). */
+.card,
+.row {
+  position: relative;
+  margin: var(--space-2) var(--space-4);
+  background: var(--card);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow);
+}
+
+.row {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.row::-webkit-scrollbar { display: none; }
+
+.row-main {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-3) var(--space-4);
+}
+
+/* Red delete panel revealed by left-swipe; also a real focusable control. */
+.row-delete {
+  flex: 0 0 88px;
+  scroll-snap-align: end;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  border: none;
+  background: var(--danger);
+  color: var(--on-danger);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Name + optional note stack */
+.row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.note {
+  color: var(--sub);
+  font-size: var(--fs-sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.count {
+  flex: 0 0 auto;
+  color: var(--sub);
+  font-size: var(--fs-sub);
+}
+
+/* Whole-card tap affordance (lists home rows) */
+.row-main.tappable { cursor: pointer; }
+
+/* ── Checkbox (.box / .box.on) ───────────────────────────────────────── */
+.box {
+  position: relative;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 2px solid var(--ac);
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+/* Invisible 48px hit area centred on the visible 26px box. */
+.box::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 48px;
+  height: 48px;
+  transform: translate(-50%, -50%);
+}
+.box.on {
+  background: var(--ac);
+  border-color: var(--ac);
+}
+.box.on::after {
+  content: "✓";
+  color: var(--ontop);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Amount + stepper ────────────────────────────────────────────────── */
+.stepper {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.step {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--ac);
+  border: 1.5px solid var(--ac);
+  border-radius: var(--r-pill);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+/* Expand each step button to a 48px hit target without bloating the row. */
+.step::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 48px;
+  height: 48px;
+  transform: translate(-50%, -50%);
+}
+.amount {
+  min-width: 2.25ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/* Non-numeric amount is edited by tapping the text. */
+.amount.editable {
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--r-ctl);
+  color: var(--tx);
+  background: color-mix(in srgb, var(--ac) 12%, transparent);
+}
+
+/* ── Watch bell (🔔). Colour emoji ignore CSS `color`, so on/off is
+   grayscale + opacity, per the A1 fix. ───────────────────────────────── */
+.watch-toggle {
+  flex: 0 0 auto;
+  min-width: 48px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  filter: grayscale(1);
+  opacity: 0.35;
+}
+.watch-toggle.on {
+  filter: none;
+  opacity: 1;
+}
+
+/* Optional WATCH text pill alternative (if a bell isn't used). */
+.watch-tag {
+  flex: 0 0 auto;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sub);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--sub);
+  background: none;
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+}
+.watch-tag.on {
+  color: var(--ontop);
+  background: var(--ac);
+  border-color: var(--ac);
+}
+
+/* ── Done section ────────────────────────────────────────────────────── */
+.done-divider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  color: var(--sub);
+  font-size: var(--fs-sub);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+/* Bulk "clear checked" text button, right-aligned on the Done divider. */
+.clear-checked {
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  border: none;
+  color: var(--ac);
+  font: inherit;
+  font-size: var(--fs-sub);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.row.done { opacity: 0.72; }
+.row.done .name {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+/* ── Autocomplete dropdown (child of .addbar; anchored above it) ─────── */
+.suggest {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  margin: 0 var(--space-3) var(--space-2);
+  padding: var(--space-1);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-lg);
+  max-height: 44vh;
+  overflow-y: auto;
+  z-index: 40;
+}
+.suggest[hidden] { display: none; }
+.suggest-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  border-radius: var(--r-ctl);
+  color: var(--tx);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.suggest-item .count { margin-left: auto; }
+.suggest-item:active { background: color-mix(in srgb, var(--ac) 14%, transparent); }
+
+/* ── Bottom add-bar (sticky) ─────────────────────────────────────────── */
+.addbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3);
+  padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+.addbar input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  background: var(--card);
+  color: var(--tx);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  font: inherit;
+  font-size: var(--fs-ctl);
+}
+.addbar input::placeholder { color: var(--sub); }
+.addbar input:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 1px;
+}
+.addbar button {
+  flex: 0 0 auto;
+  min-height: 48px;
+  min-width: 48px;
+  padding: 0 var(--space-4);
+  background: var(--ac);
+  color: var(--ontop);
+  border: none;
+  border-radius: var(--r-ctl);
+  font: inherit;
+  font-size: var(--fs-ctl);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Undo toast ──────────────────────────────────────────────────────── */
+.undo {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(76px + max(var(--space-3), env(safe-area-inset-bottom)));
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: calc(100vw - 2 * var(--space-4));
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  background: var(--tx);
+  color: var(--bg);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--fs-sub);
+}
+.undo[hidden] { display: none; }
+.undo .name {
+  font-weight: 600;
+}
+.undo button {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  background: none;
+  border: none;
+  border-radius: var(--r-pill);
+  color: var(--ac);
+  font: inherit;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+/* ── Appearance / settings ───────────────────────────────────────────── */
+.settings { padding: var(--space-4) 0 var(--space-5); }
+.settings-section {
+  margin: 0 var(--space-4) var(--space-4);
+}
+.settings-label {
+  display: block;
+  margin: var(--space-4) var(--space-4) var(--space-2);
+  color: var(--sub);
+  font-size: var(--fs-sub);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Theme swatch grid. Each .swatch has data-theme="<key>" so its own palette
+   resolves inside it (self-previewing). */
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+}
+.swatch {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 76px;
+  padding: var(--space-3);
+  background: var(--bg);
+  color: var(--tx);
+  border: 2px solid var(--border);
+  border-radius: var(--r-card);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.swatch-name { font-size: var(--fs-sub); }
+.swatch-chips { display: flex; gap: var(--space-1); }
+.swatch-chip {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-pill);
+  background: var(--ac);
+}
+.swatch-chip.two { background: var(--ac2); }
+.swatch.selected {
+  border-color: var(--ac);
+  box-shadow: 0 0 0 2px var(--ac);
+}
+.swatch.selected::after {
+  content: "✓";
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  background: var(--ac);
+  color: var(--ontop);
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Match-system toggle switch (.toggle / .toggle.on) */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  margin: 0 var(--space-4);
+}
+.toggle-row .label { flex: 1; }
+.toggle {
+  position: relative;
+  flex: 0 0 auto;
+  width: 52px;
+  min-height: 48px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.toggle::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 52px;
+  height: 32px;
+  transform: translateY(-50%);
+  background: var(--border);
+  border-radius: var(--r-pill);
+}
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  transform: translateY(-50%);
+  background: var(--card);
+  border-radius: var(--r-pill);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+}
+.toggle.on::before { background: var(--ac); }
+.toggle.on::after { left: 23px; }
+
+/* Sign-out control */
+.signout {
+  display: block;
+  width: calc(100% - 2 * var(--space-4));
+  min-height: 48px;
+  margin: var(--space-5) var(--space-4) 0;
+  padding: 0 var(--space-4);
+  background: none;
+  color: var(--danger);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-ctl);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Focus visibility (keyboard) ─────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+/* ── Motion: only animate when the user hasn't asked to reduce it ───── */
+@media (prefers-reduced-motion: no-preference) {
+  .box,
+  .box.on::after,
+  .row.done,
+  .row.done .name,
+  .watch-toggle,
+  .watch-tag,
+  .toggle::before,
+  .toggle::after,
+  .swatch,
+  .addbar button,
+  .step {
+    transition:
+      background-color var(--dur) var(--ease),
+      border-color var(--dur) var(--ease),
+      color var(--dur) var(--ease),
+      opacity var(--dur) var(--ease),
+      filter var(--dur) var(--ease),
+      left var(--dur) var(--ease),
+      box-shadow var(--dur) var(--ease),
+      transform var(--dur) var(--ease);
+  }
+  .row { scroll-behavior: smooth; }
+  .box.on { transform: scale(1); }
+  .addbar button:active,
+  .step:active,
+  .swatch:active { transform: scale(0.96); }
+}
+
+/* ── Sign-in ─────────────────────────────────────────────────────────── */
+.signin {
+  min-height: 100dvh;
+  max-width: 380px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4)
+           max(var(--space-5), env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-3);
+}
+.signin h1 {
+  margin: 0 0 var(--space-3);
+  text-align: center;
+  font-size: var(--fs-title);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ac);
+}
+.signin input {
+  min-height: 52px;
+  padding: 0 var(--space-4);
+  background: var(--card);
+  color: var(--tx);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  font: inherit;
+  font-size: var(--fs-ctl);
+}
+.signin input::placeholder { color: var(--sub); }
+.signin button {
+  min-height: 52px;
+  margin-top: var(--space-1);
+  background: var(--ac);
+  color: var(--ontop);
+  border: none;
+  border-radius: var(--r-ctl);
+  font: inherit;
+  font-size: var(--fs-ctl);
+  font-weight: 700;
+  cursor: pointer;
+}
+.signin .err {
+  margin: 0;
+  text-align: center;
+  color: var(--danger);
+  font-size: var(--fs-sub);
+}
+.signin .err[hidden] { display: none; }
