@@ -11,7 +11,7 @@ Make the app feel polished and personal before it goes on Joel's and Gabrielle's
 ## 2. Scope
 **In:**
 - Visual overhaul (warm & friendly layout, tokens, spacing, system font, tap targets, safe-area).
-- Theme system + in-app picker (per-device), default Blue + Gold, plus an auto light/dark behavior.
+- Theme system + in-app picker (per-device), default Terracotta, plus an auto light/dark behavior.
 - List detail: checked items sink into a faded "Done" group; sticky bottom add-bar.
 - Swipe-left-to-delete with confirm on watched items + an Undo affordance after any delete.
 - Item fields: free-text **amount** (replaces integer quantity), optional **note**.
@@ -37,8 +37,8 @@ A theme is a full palette expressed as CSS custom properties. Applied by setting
 
 | key | bg | card | text | sub | border | accent (`--ac`) | accent-2 (`--ac2`) | ontop |
 |---|---|---|---|---|---|---|---|---|
-| `bluegold` (default) | `#24408f` | `#2f4db0` | `#efe9d2` | `#aca375` | `#3f5cbd` | `#cdb24a` | `#cdb24a` | `#1a2c66` |
-| `terracotta` | `#faf6ef` | `#ffffff` | `#2c2a26` | `#a99f8f` | `#e3dccb` | `#e0803a` | `#e0803a` | `#ffffff` |
+| `bluegold` | `#24408f` | `#2f4db0` | `#efe9d2` | `#aca375` | `#3f5cbd` | `#cdb24a` | `#cdb24a` | `#1a2c66` |
+| `terracotta` (default) | `#faf6ef` | `#ffffff` | `#2c2a26` | `#a99f8f` | `#e3dccb` | `#e0803a` | `#e0803a` | `#ffffff` |
 | `green` | `#faf6ef` | `#ffffff` | `#2c2a26` | `#a99f8f` | `#e3dccb` | `#3f9d63` | `#3f9d63` | `#ffffff` |
 | `berry` | `#faf6ef` | `#ffffff` | `#2c2a26` | `#a99f8f` | `#e3dccb` | `#cf5a75` | `#cf5a75` | `#ffffff` |
 | `festive` | `#f7f3ec` | `#ffffff` | `#26312a` | `#9aa79c` | `#e3e0d3` | `#1f7a4d` | `#c0392b` | `#ffffff` |
@@ -52,7 +52,7 @@ Header title uses the accent (or a lighter accent tint on colored-bg themes). Co
 - **Appearance screen** (opened from the ⚙️ gear): a grid of theme swatches (tap to apply instantly) + a **"Match system light/dark"** toggle + a **Sign out** control.
 - **Storage:** per device in `localStorage` (`glTheme`, `glAutoDark`). No backend, no sync (each phone can differ). Applied before first paint to avoid a flash (inline bootstrap in `index.html` reads `localStorage` and sets `data-theme`).
 - **Auto light/dark (kept simple):** when "Match system" is ON, the app shows the user's chosen theme while the system is in light mode and switches to **`midnight`** while the system is in dark mode (listening to `matchMedia('(prefers-color-scheme: dark)')`). When OFF, the chosen theme is always used. This avoids maintaining a dark variant of every theme.
-- **Default:** first launch = `bluegold`, Match-system = ON.
+- **Default:** first launch = `terracotta`, Match-system = ON.
 
 ## 4. Screens
 - **Lists home:** title "Our Lists" + ⚙️ gear; each list = rounded card with emoji, name, item count; "＋ New list" action; empty state ("No lists yet — create one below").

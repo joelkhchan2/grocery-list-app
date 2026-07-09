@@ -79,6 +79,7 @@ const handlers = {
   onAmount: (it, amount) => mutate(() => db.updateItem(client, it.id, { amount }), [it.id]),
   onEditAmount: (it, amount) => mutate(() => db.updateItem(client, it.id, { amount }), [it.id]),
   onEditItem: (it, name) => mutate(() => db.updateItem(client, it.id, { name }), [it.id]),
+  onEditNote: (it, note) => mutate(() => db.updateItem(client, it.id, { note }), [it.id]),
   onDeleteItem: (it) => {
     mutate(() => db.deleteItem(client, it.id), [it.id]);
     // reinsertItem (not addItem) preserves watch/checked/sort_order so an undone watch still feeds the watcher.

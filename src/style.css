@@ -826,3 +826,23 @@ body {
   font-size: var(--fs-sub);
 }
 .signin .err[hidden] { display: none; }
+
+/* ── Editable amount + add-note affordance ───────────────────────────── */
+.amount.editable {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.row-text .note { cursor: pointer; }
+.add-note {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 0;
+  min-height: 0;
+  background: none;
+  border: none;
+  color: var(--sub);
+  font: inherit;
+  font-size: var(--fs-sub);
+  cursor: pointer;
+}

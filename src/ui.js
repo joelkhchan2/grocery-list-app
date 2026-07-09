@@ -127,6 +127,23 @@ export function renderListDetail(mount, list, items, handlers) {
   }));
 }
 
+// Prompt to edit an item's amount as free text ("2", "500 g", "2 L"). Works from
+// the numeric stepper too, so a plain count can be turned into "500 g".
+function editAmountPrompt(item, handlers) {
+  const next = prompt("Amount (e.g. 2, 500 g, 2 L)", item.amount || "");
+  if (next === null) return;                         // cancelled
+  const t = next.trim();
+  if (t && t !== String(item.amount || "").trim()) handlers.onEditAmount(item, t);
+}
+
+// Prompt to add / edit / clear an item's note. Blank input removes the note.
+function editNotePrompt(item, handlers) {
+  const next = prompt("Note (leave blank to remove)", item.note || "");
+  if (next === null) return;                         // cancelled
+  const t = next.trim();
+  handlers.onEditNote(item, t === "" ? null : t);
+}
+
 // One swipe-to-delete row: .row → .row-main (100% wide) + .row-delete (revealed on left-swipe).
 function buildItemRow(item, handlers) {
   const main = el("div", { class: "row-main" });
@@ -138,7 +155,7 @@ function buildItemRow(item, handlers) {
     on: { click: () => handlers.onToggleCheck(item) },
   }));
 
-  // Name (+ optional note) stack. Tapping the name edits it via prompt.
+  // Name + note stack. Tap name → rename; tap note → edit/clear; "+ note" → add.
   const text = el("div", { class: "row-text" },
     el("span", {
       class: "name", text: item.name,
@@ -150,17 +167,27 @@ function buildItemRow(item, handlers) {
         },
       },
     }));
-  if (item.note) text.append(el("span", { class: "note", text: item.note }));
+  if (item.note) {
+    text.append(el("span", { class: "note", text: item.note,
+      on: { click: () => editNotePrompt(item, handlers) } }));
+  } else {
+    text.append(el("button", { type: "button", class: "add-note", text: "+ note",
+      on: { click: () => editNotePrompt(item, handlers) } }));
+  }
   main.append(text);
 
-  // Amount — numeric gets a −/value/+ stepper; anything else is tap-to-edit text.
+  // Amount — numeric gets a −/value/+ stepper; the value is tappable to switch to
+  // free text (e.g. "500 g"). A non-numeric amount is tap-to-edit text.
   if (isNumericAmount(item.amount)) {
     main.append(el("div", { class: "stepper" },
       el("button", {
         type: "button", class: "step", "aria-label": "Fewer", text: "−",
         on: { click: () => handlers.onAmount(item, stepAmount(item.amount, -1)) },
       }),
-      el("span", { class: "amount", text: String(item.amount).trim() }),
+      el("span", {
+        class: "amount editable", text: String(item.amount).trim(), "aria-label": "Edit amount",
+        on: { click: () => editAmountPrompt(item, handlers) },
+      }),
       el("button", {
         type: "button", class: "step", "aria-label": "More", text: "+",
         on: { click: () => handlers.onAmount(item, stepAmount(item.amount, +1)) },
@@ -168,15 +195,7 @@ function buildItemRow(item, handlers) {
   } else {
     main.append(el("span", {
       class: "amount editable", text: item.amount || "", "aria-label": "Edit amount",
-      on: {
-        click: () => {
-          const next = prompt("Edit amount", item.amount || "");
-          const trimmed = next && next.trim();
-          if (trimmed && trimmed !== String(item.amount || "").trim()) {
-            handlers.onEditAmount(item, trimmed);
-          }
-        },
-      },
+      on: { click: () => editAmountPrompt(item, handlers) },
     }));
   }
 

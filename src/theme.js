@@ -1,4 +1,4 @@
-export const DEFAULT_THEME = "bluegold";
+export const DEFAULT_THEME = "terracotta";
 export const DARK_THEME = "midnight";
 export const THEMES = [
   { key: "bluegold", label: "Blue + Gold", dark: false },

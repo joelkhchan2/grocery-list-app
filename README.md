@@ -6,7 +6,7 @@ Each item has a name, a free-text **amount** (e.g. "500 g", "2 L", or a plain nu
 
 ## Themes & appearance
 
-Tap ⚙️ → Appearance to pick from 8 themes. The default is **Blue + Gold**. There's also a "match system light/dark" option, which switches to the Midnight theme automatically when the phone is in dark mode.
+Tap ⚙️ → Appearance to pick from 8 themes. The default is **Terracotta**. There's also a "match system light/dark" option, which switches to the Midnight theme automatically when the phone is in dark mode.
 
 Theme choice is remembered **per device**, stored in the browser's localStorage. It is not synced through Supabase, so each phone can have its own theme independent of the other.
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#24408f">
+  <meta name="theme-color" content="#faf6ef">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -15,7 +15,7 @@
   <script>
     // Pre-paint theme bootstrap: set data-theme before the app JS runs to avoid a theme flash.
     try {
-      var t = localStorage.getItem("glTheme") || "bluegold";
+      var t = localStorage.getItem("glTheme") || "terracotta";
       var auto = localStorage.getItem("glAutoDark") !== "0";
       var darkSys = matchMedia("(prefers-color-scheme: dark)").matches;
       document.documentElement.dataset.theme = (auto && darkSys) ? "midnight" : t;
