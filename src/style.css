@@ -1201,6 +1201,9 @@ details[open] > .store-summary::before { content: "▾"; }
 .emoji-sheet {
   width: 100%;
   max-width: 480px;
+  max-height: 80vh;                 /* cap tall sheets (e.g. the store picker) */
+  overflow-y: auto;                 /* and scroll within, so nothing is stuck off-screen */
+  -webkit-overflow-scrolling: touch;
   background: var(--card);
   color: var(--tx);
   border-radius: var(--r-card) var(--r-card) 0 0;
