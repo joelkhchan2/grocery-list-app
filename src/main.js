@@ -1,7 +1,7 @@
 import { getClient } from "./supabase.js";
 import { currentSession, signIn, signOut, renderSignIn } from "./auth.js";
 import * as db from "./db.js";
-import { renderLists, renderListDetail, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt } from "./ui.js";
+import { renderLists, renderListDetail, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, setMyStores } from "./ui.js";
 import { loadPrefs, savePrefs, applyTheme, resolveActive } from "./theme.js";
 import { isSelfEcho, idsToClear, bySortOrder } from "./model.js";
 
@@ -28,6 +28,7 @@ let sortMode = "manual";            // per-device list sort/group: manual | alph
 try { sortMode = localStorage.getItem("glSort") || "manual"; } catch { /* private mode */ }
 let haptics = true;                 // per-device: vibrate on check / drag (where supported)
 try { haptics = localStorage.getItem("glHaptics") !== "0"; } catch { /* private mode */ }
+try { const s = localStorage.getItem("glMyStores"); if (s) setMyStores(JSON.parse(s)); } catch { /* private mode */ }
 
 function haptic(ms = 10) {
   if (haptics && typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ms);
@@ -159,6 +160,11 @@ const handlers = {
     haptics = bool;
     try { localStorage.setItem("glHaptics", bool ? "1" : "0"); } catch { /* private mode */ }
     if (bool) haptic(12);
+    refresh();
+  },
+  onSetMyStores: (arr) => {
+    setMyStores(arr);
+    try { localStorage.setItem("glMyStores", JSON.stringify(arr)); } catch { /* private mode */ }
     refresh();
   },
   // Autocomplete: debounced history lookup that updates ONLY the #suggest dropdown.

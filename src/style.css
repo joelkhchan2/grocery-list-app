@@ -923,7 +923,30 @@ body {
 }
 .store-opt.on { color: var(--ac); font-weight: 700; }
 .store-opt:active { background: var(--bg); }
-.watch-flag { flex: none; font-size: var(--fs-sub); color: var(--ac); font-weight: 600; white-space: nowrap; }
+.icon { display: block; }
+.watch-flag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--fs-sub);
+  color: var(--ac);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* My-stores editor (Appearance) */
+.store-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 var(--space-4) var(--space-4);
+}
+.store-edit-row { display: flex; align-items: center; gap: var(--space-2); }
+.store-edit-row .grow { flex: 1; }
+.store-add { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+.store-add .prompt-input { margin: 0; }
+.store-add .prompt-save { flex: none; }
 
 /* ── Prompt / confirm dialogs (reuse .emoji-overlay / .emoji-sheet) ───── */
 .prompt-input {

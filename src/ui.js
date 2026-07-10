@@ -25,8 +25,38 @@ function itemCountLabel(n) {
   return `${n} item${n === 1 ? "" : "s"}`;
 }
 
+// Monochrome inline-SVG icons (inherit color via currentColor). Path data is
+// author-controlled (no user input), so innerHTML is safe here.
+const ICONS = {
+  settings: '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>',
+  back: '<polyline points="15 18 9 12 15 6"></polyline>',
+  more: '<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"></circle><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"></circle>',
+  drag: '<circle cx="9" cy="5" r="1.5" fill="currentColor" stroke="none"></circle><circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none"></circle><circle cx="9" cy="19" r="1.5" fill="currentColor" stroke="none"></circle><circle cx="15" cy="5" r="1.5" fill="currentColor" stroke="none"></circle><circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none"></circle><circle cx="15" cy="19" r="1.5" fill="currentColor" stroke="none"></circle>',
+  bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path>',
+  close: '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>',
+};
+
+function icon(name, size = 22) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", size);
+  svg.setAttribute("height", size);
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("icon");
+  svg.innerHTML = ICONS[name] || "";
+  return svg;
+}
+
 // Store picker options: the household's usual stores first, then other common GTA stores.
-const MY_STORES = ["No Frills", "FreshCo", "Walmart", "Real Canadian Superstore", "Food Basics"];
+let MY_STORES = ["No Frills", "FreshCo", "Walmart", "Real Canadian Superstore", "Food Basics"];
+export const DEFAULT_MY_STORES = MY_STORES.slice();
+export function setMyStores(arr) { if (Array.isArray(arr)) MY_STORES = arr.slice(); }
+export function getMyStores() { return MY_STORES.slice(); }
 const OTHER_STORES = ["Costco", "T&T", "Loblaws", "Metro", "Sobeys", "Longo's", "Farm Boy",
   "Fortinos", "Shoppers Drug Mart", "Adonis", "Btrust", "Bulk Barn", "Dollarama", "Whole Foods"];
 
@@ -281,9 +311,9 @@ export function renderLists(mount, lists, templates, handlers) {
   mount.append(el("div", { class: "bar" },
     el("h1", { text: "Our Grocery Lists" }),
     el("button", {
-      type: "button", class: "icon-btn", "aria-label": "Settings", text: "⚙️",
+      type: "button", class: "icon-btn", "aria-label": "Settings",
       on: { click: () => handlers.onOpenSettings() },
-    })));
+    }, icon("settings"))));
 
   const listEl = el("div", { class: "list" });
   if (!lists.length) {
@@ -296,9 +326,9 @@ export function renderLists(mount, lists, templates, handlers) {
         on: { click: () => handlers.onOpenList(list.id) },
       });
       main.append(el("span", {
-        class: "drag-handle", "aria-hidden": "true", text: "⠿",
+        class: "drag-handle", "aria-hidden": "true",
         on: { click: (e) => e.stopPropagation() },
-      }));
+      }, icon("drag", 20)));
       main.append(el("button", {
         type: "button", class: list.emoji ? "emoji-btn" : "emoji-btn placeholder",
         "aria-label": list.emoji ? "Change list emoji" : "Add list emoji", text: list.emoji || "＋",
@@ -321,9 +351,9 @@ export function renderLists(mount, lists, templates, handlers) {
 
       // List actions menu (rename / duplicate / …). Stops propagation so it doesn't open the list.
       main.append(el("button", {
-        type: "button", class: "icon-btn", "aria-label": "List actions", text: "⋯",
+        type: "button", class: "icon-btn", "aria-label": "List actions",
         on: { click: (e) => { e.stopPropagation(); handlers.onListMenu(list); } },
-      }));
+      }, icon("more")));
 
       // Red delete panel (revealed by left-swipe). List deletion cascades its items → styled confirm.
       const del = el("button", {
@@ -374,14 +404,14 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
 
   mount.append(el("div", { class: "bar" },
     el("button", {
-      type: "button", class: "icon-btn", "aria-label": "Back", text: "‹",
+      type: "button", class: "icon-btn", "aria-label": "Back",
       on: { click: () => handlers.onBack() },
-    }),
+    }, icon("back")),
     el("h1", { text: list.name }),
     el("button", {
-      type: "button", class: "icon-btn", "aria-label": "Settings", text: "⚙️",
+      type: "button", class: "icon-btn", "aria-label": "Settings",
       on: { click: () => handlers.onOpenSettings() },
-    })));
+    }, icon("settings"))));
 
   const listEl = el("div", { class: "list" });
   if (!items.length) {
@@ -527,7 +557,7 @@ function buildItemRow(item, handlers, opts = {}) {
 
   // Decorative drag handle (Manual sort). aria-hidden — the accessible reorder path
   // is Move up / Move down in the ⋯ menu.
-  if (opts.drag) main.append(el("span", { class: "drag-handle", "aria-hidden": "true", text: "⠿" }));
+  if (opts.drag) main.append(el("span", { class: "drag-handle", "aria-hidden": "true" }, icon("drag", 20)));
 
   // Checkbox — checked ✓ is drawn solely by CSS `.box.on::after`.
   main.append(el("button", {
@@ -554,7 +584,7 @@ function buildItemRow(item, handlers, opts = {}) {
       text: who.initial, style: { background: who.color },
     }));
   }
-  if (item.watch) meta.append(el("span", { class: "watch-flag", text: "🔔 watch" }));
+  if (item.watch) meta.append(el("span", { class: "watch-flag" }, icon("bell", 14), document.createTextNode(" watch")));
   meta.append(buildStoreChip(item, handlers));
   if (item.note) {
     meta.append(el("span", { class: "note", text: item.note,
@@ -583,9 +613,9 @@ function buildItemRow(item, handlers, opts = {}) {
 
   // Overflow menu (watch toggle · move to list · move up/down). Keeps the row uncluttered.
   main.append(el("button", {
-    type: "button", class: "icon-btn", "aria-label": "Item actions", text: "⋯",
+    type: "button", class: "icon-btn", "aria-label": "Item actions",
     on: { click: () => handlers.onItemMenu(item) },
-  }));
+  }, icon("more")));
 
   return el("div", {
     class: "row", dataset: { name: String(item.name || "").toLowerCase(), id: item.id },
@@ -651,9 +681,9 @@ export function renderAppearance(mount, prefs, handlers) {
 
   mount.append(el("div", { class: "bar" },
     el("button", {
-      type: "button", class: "icon-btn", "aria-label": "Back", text: "‹",
+      type: "button", class: "icon-btn", "aria-label": "Back",
       on: { click: () => handlers.onBack() },
-    }),
+    }, icon("back")),
     el("h1", { text: "Appearance" })));
 
   const settings = el("div", { class: "settings" });
@@ -694,6 +724,28 @@ export function renderAppearance(mount, prefs, handlers) {
       role: "switch", "aria-checked": String(!!prefs.haptics), "aria-label": "Haptic feedback",
       on: { click: () => handlers.onToggleHaptics(!prefs.haptics) },
     })));
+
+  // My stores — customize the list shown first in each item's store picker.
+  settings.append(el("span", { class: "settings-label", text: "My stores" }));
+  const storeEdit = el("div", { class: "store-edit" });
+  for (const s of getMyStores()) {
+    storeEdit.append(el("div", { class: "store-edit-row" },
+      el("span", { class: "grow", text: s }),
+      el("button", {
+        type: "button", class: "icon-btn danger", "aria-label": `Remove ${s}`,
+        on: { click: () => handlers.onSetMyStores(getMyStores().filter((x) => x !== s)) },
+      }, icon("close", 18))));
+  }
+  const addInput = el("input", { type: "text", class: "prompt-input", placeholder: "Add a store" });
+  const addForm = el("form", { class: "store-add" }, addInput,
+    el("button", { type: "submit", class: "prompt-save", text: "Add" }));
+  addForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = addInput.value.trim();
+    if (v && !getMyStores().includes(v)) handlers.onSetMyStores([...getMyStores(), v]);
+  });
+  storeEdit.append(addForm);
+  settings.append(storeEdit);
 
   settings.append(el("button", {
     type: "button", class: "signout", text: "Sign out",
