@@ -28,7 +28,18 @@
   <div id="app"><p class="loading">Loading…</p></div>
   <script type="module" src="src/main.js"></script>
   <script>
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js");
+      // When a newly-deployed service worker takes over, reload once so the page runs
+      // the fresh code. Only when a controller already exists (an update, not first install),
+      // and guarded against reload loops.
+      if (navigator.serviceWorker.controller) {
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (!reloaded) { reloaded = true; location.reload(); }
+        });
+      }
+    }
     // If the app module never boots (offline / CDN unreachable), replace the silent hang with a message.
     setTimeout(() => {
       const el = document.querySelector("#app .loading");
