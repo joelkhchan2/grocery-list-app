@@ -105,7 +105,7 @@ async function copyList(client, listId, { isTemplate = false, suffix = "" }) {
   if (items.length) {
     await run(client.from("items").insert(items.map((it) => ({
       list_id: newList.id, name: it.name, amount: it.amount, note: it.note,
-      store: it.store, watch: it.watch, sort_order: it.sort_order, checked: false,
+      store: it.store, watch: it.watch, emoji: it.emoji, sort_order: it.sort_order, checked: false,
     }))));
   }
   return newList;

@@ -1,7 +1,7 @@
 import { getClient } from "./supabase.js";
 import { currentSession, signIn, signOut, renderSignIn } from "./auth.js";
 import * as db from "./db.js";
-import { renderLists, renderListDetail, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, setMyStores } from "./ui.js";
+import { renderLists, renderListDetail, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, showEmojiPicker, setMyStores } from "./ui.js";
 import { loadPrefs, savePrefs, applyTheme, applyCustom, resolveActive } from "./theme.js";
 import { isSelfEcho, idsToClear, bySortOrder } from "./model.js";
 
@@ -111,6 +111,7 @@ const handlers = {
   onEditItem: (it, name) => mutate(() => db.updateItem(client, it.id, { name }), [it.id]),
   onEditNote: (it, note) => mutate(() => db.updateItem(client, it.id, { note }), [it.id]),
   onSetStore: (it, store) => mutate(() => db.updateItem(client, it.id, { store }), [it.id]),
+  onSetItemEmoji: (it, emoji) => mutate(() => db.updateItem(client, it.id, { emoji: emoji || null }), [it.id]),
   onSetTargetPrice: (it, raw) => {
     const s = (raw || "").trim();
     if (s === "") return mutate(() => db.updateItem(client, it.id, { target_price: null }), [it.id]);
@@ -141,6 +142,9 @@ const handlers = {
   onUseTemplate: (id) => mutate(() => db.useTemplate(client, id)),
   onItemMenu: (it) => {
     const opts = [{
+      label: it.emoji ? `${it.emoji} Change emoji` : "😊 Add emoji",
+      onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e)),
+    }, {
       label: it.watch ? "Stop watching for deals" : "🔔 Watch for deals",
       onClick: () => handlers.onToggleWatch(it),
     }, {
@@ -176,6 +180,8 @@ const handlers = {
   },
   onWatchItemMenu: (it) => {
     showSheet(it.name, [
+      { label: it.emoji ? `${it.emoji} Change emoji` : "😊 Add emoji",
+        onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e)) },
       { label: it.watch ? "⏸ Pause alerts" : "▶ Resume alerts", onClick: () => handlers.onToggleWatch(it) },
       { label: it.target_price != null
           ? `🎯 Deal price: $${Number(it.target_price).toFixed(2)} (edit)`

@@ -315,6 +315,18 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Line 1: optional leading per-item emoji + the name. */
+.name-line { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.name-line .name { flex: 1 1 auto; }
+.item-emoji {
+  flex: none;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 1.15em;
+  line-height: 1;
+  cursor: pointer;
+}
 .note {
   color: var(--sub);
   font-size: var(--fs-sub);

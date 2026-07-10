@@ -131,7 +131,7 @@ function firstEmoji(s) {
 
 // Emoji picker: a text field that surfaces the device's native emoji keyboard (Gboard
 // etc.) so any emoji works — no static grid. onPick(emoji) on Save; onPick(null) clears.
-function showEmojiPicker(onPick) {
+export function showEmojiPicker(onPick) {
   const prev = document.querySelector(".emoji-overlay");
   if (prev) prev.remove();
   const overlay = el("div", { class: "emoji-overlay" });
@@ -664,6 +664,14 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
   }));
 }
 
+// Leading per-item emoji (tap to change via the native picker). Only rendered when set.
+function emojiLead(item, handlers) {
+  return el("button", {
+    type: "button", class: "item-emoji", text: item.emoji, "aria-label": "Change emoji",
+    on: { click: (e) => { e.stopPropagation(); showEmojiPicker((em) => handlers.onSetItemEmoji(item, em)); } },
+  });
+}
+
 // One swipe-to-delete row: .row → .row-main (100% wide) + .row-delete (revealed on left-swipe).
 function buildItemRow(item, handlers, opts = {}) {
   // Delete is immediate + undoable (the Undo bar restores it, watch flag included),
@@ -675,12 +683,15 @@ function buildItemRow(item, handlers, opts = {}) {
 
   // Done row: minimal — just checkbox + struck name (+ swipe delete). Tap the box to un-check.
   if (item.checked) {
+    const doneName = el("div", { class: "name-line" });
+    if (item.emoji) doneName.append(el("span", { class: "item-emoji", text: item.emoji }));
+    doneName.append(el("span", { class: "name", text: item.name }));
     const doneMain = el("div", { class: "row-main" },
       el("button", {
         type: "button", class: "box on", "aria-label": "Uncheck", "aria-pressed": "true",
         on: { click: () => handlers.onToggleCheck(item) },
       }),
-      el("div", { class: "row-text" }, el("span", { class: "name", text: item.name })));
+      el("div", { class: "row-text" }, doneName));
     return el("div", {
       class: "row done", dataset: { name: String(item.name || "").toLowerCase(), id: item.id },
     }, doneMain, del);
@@ -700,16 +711,19 @@ function buildItemRow(item, handlers, opts = {}) {
 
   // Name gets its own line so it stays readable; the amount control + meta chips sit on
   // line 2, and the note (if any) on line 3. The ⋯ menu is the only right-column control.
-  const text = el("div", { class: "row-text" },
-    el("span", {
-      class: "name", text: item.name,
-      on: {
-        click: (e) => inlineEdit(e.currentTarget, item.name, (v) => {
-          const t = (v || "").trim();
-          if (t && t !== item.name) handlers.onEditItem(item, t);
-        }),
-      },
-    }));
+  const nameSpan = el("span", {
+    class: "name", text: item.name,
+    on: {
+      click: (e) => inlineEdit(e.currentTarget, item.name, (v) => {
+        const t = (v || "").trim();
+        if (t && t !== item.name) handlers.onEditItem(item, t);
+      }),
+    },
+  });
+  const nameLine = el("div", { class: "name-line" });
+  if (item.emoji) nameLine.append(emojiLead(item, handlers));
+  nameLine.append(nameSpan);
+  const text = el("div", { class: "row-text" }, nameLine);
 
   // Amount control — numeric gets a −/value/+ stepper (value tappable for free text);
   // a non-numeric amount is tap-to-edit text. Lives on line 2, right-aligned.
@@ -794,16 +808,19 @@ function buildWatchRow(item, handlers) {
   const main = el("div", { class: "row-main" });
   main.append(el("span", { class: "drag-handle", "aria-hidden": "true" }, icon("drag", 20)));
 
-  const text = el("div", { class: "row-text" },
-    el("span", {
-      class: item.watch ? "name" : "name paused", text: item.name,
-      on: {
-        click: (e) => inlineEdit(e.currentTarget, item.name, (v) => {
-          const t = (v || "").trim();
-          if (t && t !== item.name) handlers.onEditItem(item, t);
-        }),
-      },
-    }));
+  const wName = el("span", {
+    class: item.watch ? "name" : "name paused", text: item.name,
+    on: {
+      click: (e) => inlineEdit(e.currentTarget, item.name, (v) => {
+        const t = (v || "").trim();
+        if (t && t !== item.name) handlers.onEditItem(item, t);
+      }),
+    },
+  });
+  const wNameLine = el("div", { class: "name-line" });
+  if (item.emoji) wNameLine.append(emojiLead(item, handlers));
+  wNameLine.append(wName);
+  const text = el("div", { class: "row-text" }, wNameLine);
 
   const targetChip = el("button", {
     type: "button", class: item.target_price != null ? "target-chip set" : "target-chip",
