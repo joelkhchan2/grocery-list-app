@@ -15,6 +15,7 @@ let lastLists = [];                 // most recent fetchLists result (for move-t
 let lastItems = [];                 // most recent list-detail items (for the item ⋯ menu: reorder)
 let storeFilter = null;             // transient: filter list detail to one store (null = all)
 let netListenersBound = false;      // guards against re-adding window online/offline listeners on re-boot
+let navState = { view: "lists", listId: null };  // mirrors the current screen for history/back sync
 
 // Theme: apply saved prefs immediately (index.html already set data-theme pre-paint to avoid a flash;
 // this keeps the JS state in sync and reacts to system dark-mode changes when auto-dark is on).
@@ -90,12 +91,21 @@ async function refresh() {
   }
 }
 
+// Navigate to a screen and record it in browser history, so the Pixel/OS back button (and
+// the in-app back button, via history.back()) step back one screen instead of exiting the app.
+function pushView(view, listId = null) {
+  navState = { view, listId };
+  state = { view, listId };
+  try { history.pushState({ gl: navState }, ""); } catch { /* history unavailable */ }
+  refresh();
+}
+
 const handlers = {
-  onOpenList: (id) => { storeFilter = null; state = { view: "detail", listId: id }; refresh(); },
+  onOpenList: (id) => { storeFilter = null; pushView("detail", id); },
   onSetStoreFilter: (v) => { storeFilter = v; refresh(); },
-  onOpenSettings: () => { state = { view: "settings" }; refresh(); },
-  onOpenDeals: () => { state = { view: "deals" }; refresh(); },
-  onBack: () => { state = { view: "lists", listId: null }; refresh(); },
+  onOpenSettings: () => pushView("settings"),
+  onOpenDeals: () => pushView("deals"),
+  onBack: () => { try { history.back(); } catch { state = { view: "lists", listId: null }; refresh(); } },
   onNewList: (name) => mutate(() => db.createList(client, { name })),
   onRenameList: (id, name) => mutate(() => db.renameList(client, id, name), [id]),
   onDeleteList: (id) => mutate(() => db.deleteList(client, id), [id]),
@@ -310,10 +320,27 @@ function subscribeRealtime() {
   }
 }
 
+// OS/browser back button: if a sheet/dialog is open, back closes it (staying on the screen);
+// otherwise step back to the previous screen from history instead of exiting the app.
+window.addEventListener("popstate", (e) => {
+  const overlay = document.querySelector(".emoji-overlay");
+  if (overlay) {
+    overlay.remove();
+    try { history.pushState({ gl: navState }, ""); } catch { /* ignore */ }  // re-consume: stay put
+    return;
+  }
+  navState = (e.state && e.state.gl) || { view: "lists", listId: null };
+  state = { view: navState.view || "lists", listId: navState.listId || null };
+  storeFilter = null;
+  refresh();
+});
+
 async function boot() {
   const session = await currentSession(client);
   if (!session) { renderSignIn(app, async (email, pw) => { await signIn(client, email, pw); boot(); }); return; }
   await refresh();
+  navState = { view: "lists", listId: null };
+  try { history.replaceState({ gl: navState }, ""); } catch { /* ignore */ }
   subscribeRealtime();
 }
 boot();
