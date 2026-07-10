@@ -900,7 +900,14 @@ body {
 }
 
 /* Store picker sheet */
-.store-picker { display: flex; flex-direction: column; }
+.store-picker {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
 .store-group-label {
   color: var(--sub);
   font-size: var(--fs-sub);
@@ -1106,7 +1113,14 @@ details[open] > .store-summary::before { content: "▾"; }
 }
 
 /* ── Action sheet menu (reuses .emoji-overlay / .emoji-sheet) ─────────── */
-.sheet-options { display: flex; flex-direction: column; }
+.sheet-options {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
 .sheet-option {
   min-height: 52px;
   text-align: left;
@@ -1201,17 +1215,21 @@ details[open] > .store-summary::before { content: "▾"; }
 .emoji-sheet {
   width: 100%;
   max-width: 480px;
-  max-height: 80vh;                 /* cap tall sheets (e.g. the store picker) */
-  overflow-y: auto;                 /* and scroll within, so nothing is stuck off-screen */
-  -webkit-overflow-scrolling: touch;
+  max-height: 85vh;                 /* cap tall sheets; the middle scrolls, not the whole sheet */
+  display: flex;
+  flex-direction: column;
   background: var(--card);
   color: var(--tx);
   border-radius: var(--r-card) var(--r-card) 0 0;
   padding: var(--space-4) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
   box-shadow: var(--shadow-lg);
 }
-.emoji-title { font-weight: 700; text-align: center; margin-bottom: var(--space-3); }
+.emoji-title { flex: none; font-weight: 700; text-align: center; margin-bottom: var(--space-3); }
 .emoji-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
   gap: var(--space-2);
@@ -1226,6 +1244,7 @@ details[open] > .store-summary::before { content: "▾"; }
 }
 .emoji-choice:active { background: var(--bg); }
 .emoji-clear {
+  flex: none;
   display: block;
   width: 100%;
   min-height: 44px;
