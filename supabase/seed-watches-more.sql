@@ -9,7 +9,7 @@ with wl as (
 insert into items (list_id, name, watch, target_price, match_keywords, negative_keywords, watch_stores, sort_order)
 select wl.id, v.name, true, v.target_price, v.match_keywords, v.negative_keywords, v.watch_stores, v.sort_order
 from wl, (values
-  ('Black Diamond cheese bar',            4.99::numeric, 'black diamond',  'slices, shredded, cracker barrel',                                        null::text,                                                    10),
+  ('Black Diamond cheese bar',            4.99::numeric, 'black diamond',  'slices, sliced, shredded, cheestrings, cracker barrel',                   null::text,                                                    10),
   ('Laughing Cow 8pk',                    2.99::numeric, 'laughing cow',   null::text,                                                                null::text,                                                    11),
   ('Nissin instant noodles 5pk',          4.99::numeric, 'nissin',         null::text,                                                                'T&T Supermarket, Btrust Supermarket, Nations Fresh Foods',    12),
   ('Sekka rice',                         14.99::numeric, 'sekka',          null::text,                                                                'T&T Supermarket, Btrust Supermarket, Nations Fresh Foods',    13),
