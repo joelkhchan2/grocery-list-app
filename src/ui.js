@@ -602,6 +602,11 @@ function buildItemRow(item, handlers, opts = {}) {
     }));
   }
   if (item.watch) meta.append(el("span", { class: "watch-flag" }, icon("bell", 14), document.createTextNode(" watch")));
+  if (item.target_price != null) {
+    meta.append(el("span", { class: "target-flag",
+      text: `🎯 ≤ $${Number(item.target_price).toFixed(2)}`,
+      title: "Deal-price alert target" }));
+  }
   meta.append(buildStoreChip(item, handlers));
   if (item.note) {
     meta.append(el("span", { class: "note", text: item.note,

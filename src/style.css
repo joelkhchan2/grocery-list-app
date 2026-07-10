@@ -967,6 +967,13 @@ body {
   font-weight: 600;
   white-space: nowrap;
 }
+.target-flag {
+  flex: none;
+  font-size: var(--fs-sub);
+  color: var(--ac);
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 /* My-stores editor (Appearance) */
 .store-edit {

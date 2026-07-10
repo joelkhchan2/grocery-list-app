@@ -100,6 +100,14 @@ const handlers = {
   onEditItem: (it, name) => mutate(() => db.updateItem(client, it.id, { name }), [it.id]),
   onEditNote: (it, note) => mutate(() => db.updateItem(client, it.id, { note }), [it.id]),
   onSetStore: (it, store) => mutate(() => db.updateItem(client, it.id, { store }), [it.id]),
+  onSetTargetPrice: (it, raw) => {
+    const s = (raw || "").trim();
+    if (s === "") return mutate(() => db.updateItem(client, it.id, { target_price: null }), [it.id]);
+    const n = parseFloat(s.replace(/[^0-9.]/g, ""));
+    if (!isFinite(n) || n <= 0) { setStatus("Enter a price like 4.00"); return; }
+    // A target implies you want the deal watched — turn on 🔔 alongside it.
+    return mutate(() => db.updateItem(client, it.id, { target_price: n, watch: true }), [it.id]);
+  },
   onSetListEmoji: (id, emoji) => mutate(() => db.updateList(client, id, { emoji }), [id]),
   onSetSort: (mode) => {
     sortMode = mode;
@@ -124,6 +132,13 @@ const handlers = {
     const opts = [{
       label: it.watch ? "Stop watching for deals" : "🔔 Watch for deals",
       onClick: () => handlers.onToggleWatch(it),
+    }, {
+      label: it.target_price != null
+        ? `🎯 Deal price: $${Number(it.target_price).toFixed(2)} (edit)`
+        : "🎯 Set deal price",
+      onClick: () => showPrompt("Alert me at or under ($)",
+        it.target_price != null ? String(it.target_price) : "",
+        (v) => handlers.onSetTargetPrice(it, v), { placeholder: "e.g. 4.00 — blank to clear" }),
     }];
     const targets = lastLists.filter((l) => l.id !== state.listId && !l.is_template);
     if (targets.length) {
