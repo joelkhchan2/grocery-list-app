@@ -1,7 +1,7 @@
 import { getClient } from "./supabase.js";
 import { currentSession, signIn, signOut, renderSignIn } from "./auth.js";
 import * as db from "./db.js";
-import { renderLists, renderListDetail, renderSuggestions, renderAppearance, showUndo, showSheet } from "./ui.js";
+import { renderLists, renderListDetail, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt } from "./ui.js";
 import { loadPrefs, savePrefs, applyTheme, resolveActive } from "./theme.js";
 import { isSelfEcho, idsToClear, bySortOrder } from "./model.js";
 
@@ -147,11 +147,10 @@ const handlers = {
   },
   onListMenu: (list) => {
     showSheet(list.name, [
-      { label: "Rename list", onClick: () => {
-          const next = prompt("Rename list", list.name);
-          const t = next && next.trim();
+      { label: "Rename list", onClick: () => showPrompt("Rename list", list.name, (v) => {
+          const t = (v || "").trim();
           if (t && t !== list.name) handlers.onRenameList(list.id, t);
-        } },
+        }) },
       { label: "Duplicate list", onClick: () => handlers.onDuplicateList(list.id) },
       { label: "Save as template", onClick: () => handlers.onSaveTemplate(list.id) },
     ]);

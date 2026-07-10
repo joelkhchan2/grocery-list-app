@@ -869,6 +869,34 @@ body {
 .store-select.set { color: var(--tx); font-weight: 600; }
 .watch-flag { flex: none; font-size: var(--fs-sub); color: var(--ac); font-weight: 600; white-space: nowrap; }
 
+/* ── Prompt / confirm dialogs (reuse .emoji-overlay / .emoji-sheet) ───── */
+.prompt-input {
+  width: 100%;
+  min-height: 48px;
+  margin: var(--space-2) 0 var(--space-4);
+  padding: 0 var(--space-3);
+  background: var(--bg);
+  color: var(--tx);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  font: inherit;
+  font-size: var(--fs-ctl);
+}
+.confirm-msg { margin: 0 0 var(--space-4); color: var(--sub); font-size: var(--fs-sub); }
+.prompt-actions { display: flex; justify-content: flex-end; gap: var(--space-3); }
+.prompt-cancel,
+.prompt-save {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--r-ctl);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.prompt-cancel { background: none; border: 1px solid var(--border); color: var(--tx); }
+.prompt-save { background: var(--ac); border: none; color: var(--ontop); }
+.prompt-save.danger { background: var(--danger); color: var(--on-danger); }
+
 /* ── Group by store ──────────────────────────────────────────────────── */
 .group-toggle {
   display: flex;

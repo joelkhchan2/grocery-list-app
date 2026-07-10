@@ -143,6 +143,41 @@ export function showSheet(title, options) {
   document.body.append(overlay);
 }
 
+// Styled text-input dialog (replaces native prompt). onSubmit(value) on Save.
+export function showPrompt(title, value, onSubmit, { placeholder = "" } = {}) {
+  const prev = document.querySelector(".emoji-overlay");
+  if (prev) prev.remove();
+  const overlay = el("div", { class: "emoji-overlay" });
+  const input = el("input", { type: "text", class: "prompt-input", value: value || "", placeholder });
+  const form = el("form", { class: "emoji-sheet" },
+    el("div", { class: "emoji-title", text: title }),
+    input,
+    el("div", { class: "prompt-actions" },
+      el("button", { type: "button", class: "prompt-cancel", text: "Cancel", on: { click: () => overlay.remove() } }),
+      el("button", { type: "submit", class: "prompt-save", text: "Save" })));
+  form.addEventListener("submit", (e) => { e.preventDefault(); const v = input.value; overlay.remove(); onSubmit(v); });
+  overlay.append(form);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.append(overlay);
+  setTimeout(() => { input.focus(); input.select(); }, 30);
+}
+
+// Styled confirm dialog (replaces native confirm). onConfirm() on the danger action.
+export function showConfirm(title, message, onConfirm, { confirmLabel = "Delete" } = {}) {
+  const prev = document.querySelector(".emoji-overlay");
+  if (prev) prev.remove();
+  const overlay = el("div", { class: "emoji-overlay" });
+  overlay.append(el("div", { class: "emoji-sheet" },
+    el("div", { class: "emoji-title", text: title }),
+    message ? el("p", { class: "confirm-msg", text: message }) : null,
+    el("div", { class: "prompt-actions" },
+      el("button", { type: "button", class: "prompt-cancel", text: "Cancel", on: { click: () => overlay.remove() } }),
+      el("button", { type: "button", class: "prompt-save danger", text: confirmLabel,
+        on: { click: () => { overlay.remove(); onConfirm(); } } }))));
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.append(overlay);
+}
+
 // Drag-to-reorder via a per-row handle. Rows are the direct children of `zone`,
 // each with data-id and a `.drag-handle` child. Dragging only starts from the
 // handle (which has touch-action:none in CSS), so it never fights list scrolling
@@ -247,15 +282,12 @@ export function renderLists(mount, lists, templates, handlers) {
         on: { click: (e) => { e.stopPropagation(); handlers.onListMenu(list); } },
       }));
 
-      // Red delete panel (revealed by left-swipe). List deletion cascades its items.
+      // Red delete panel (revealed by left-swipe). List deletion cascades its items → styled confirm.
       const del = el("button", {
         type: "button", class: "row-delete", text: "Delete",
         on: {
-          click: () => {
-            if (confirm(`Delete list "${list.name}"? Its items will be removed too.`)) {
-              handlers.onDeleteList(list.id);
-            }
-          },
+          click: () => showConfirm(`Delete "${list.name}"?`, "Its items will be removed too.",
+            () => handlers.onDeleteList(list.id)),
         },
       });
 
@@ -278,7 +310,7 @@ export function renderLists(mount, lists, templates, handlers) {
         }));
       const del = el("button", {
         type: "button", class: "row-delete", text: "Delete",
-        on: { click: () => { if (confirm(`Delete template "${t.name}"?`)) handlers.onDeleteList(t.id); } },
+        on: { click: () => showConfirm(`Delete template "${t.name}"?`, "", () => handlers.onDeleteList(t.id)) },
       });
       tbody.append(el("div", { class: "row", dataset: { id: t.id } }, main, del));
     }
@@ -413,30 +445,27 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
 // Prompt to edit an item's amount as free text ("2", "500 g", "2 L"). Works from
 // the numeric stepper too, so a plain count can be turned into "500 g".
 function editAmountPrompt(item, handlers) {
-  const next = prompt("Amount (e.g. 2, 500 g, 2 L)", item.amount || "");
-  if (next === null) return;                         // cancelled
-  const t = next.trim();
-  if (t && t !== String(item.amount || "").trim()) handlers.onEditAmount(item, t);
+  showPrompt("Amount", item.amount || "", (v) => {
+    const t = (v || "").trim();
+    if (t && t !== String(item.amount || "").trim()) handlers.onEditAmount(item, t);
+  }, { placeholder: "e.g. 2, 500 g, 2 L" });
 }
 
-// Prompt to add / edit / clear an item's note. Blank input removes the note.
+// Add / edit / clear an item's note. Blank input removes the note.
 function editNotePrompt(item, handlers) {
-  const next = prompt("Note (leave blank to remove)", item.note || "");
-  if (next === null) return;                         // cancelled
-  const t = next.trim();
-  handlers.onEditNote(item, t === "" ? null : t);
+  showPrompt("Note", item.note || "", (v) => {
+    const t = (v || "").trim();
+    handlers.onEditNote(item, t === "" ? null : t);
+  }, { placeholder: "leave blank to remove" });
 }
 
 // One swipe-to-delete row: .row → .row-main (100% wide) + .row-delete (revealed on left-swipe).
 function buildItemRow(item, handlers, opts = {}) {
+  // Delete is immediate + undoable (the Undo bar restores it, watch flag included),
+  // so no confirm dialog is needed on a single item.
   const del = el("button", {
     type: "button", class: "row-delete", text: "Delete",
-    on: {
-      click: () => {
-        if (item.watch && !confirm("This item is on your deal-watch list — remove it anyway?")) return;
-        handlers.onDeleteItem(item);
-      },
-    },
+    on: { click: () => handlers.onDeleteItem(item) },
   });
 
   // Done row: minimal — just checkbox + struck name (+ swipe delete). Tap the box to un-check.
@@ -469,11 +498,10 @@ function buildItemRow(item, handlers, opts = {}) {
     el("span", {
       class: "name", text: item.name,
       on: {
-        click: () => {
-          const next = prompt("Edit item", item.name);
-          const trimmed = next && next.trim();
-          if (trimmed && trimmed !== item.name) handlers.onEditItem(item, trimmed);
-        },
+        click: () => showPrompt("Edit item", item.name, (v) => {
+          const t = (v || "").trim();
+          if (t && t !== item.name) handlers.onEditItem(item, t);
+        }),
       },
     }));
   const meta = el("div", { class: "item-meta" });
