@@ -35,9 +35,10 @@ export async function fetchItems(client, listId) {
   return bySortOrder(await run(
     client.from("items").select("*").eq("list_id", listId).order("sort_order")));
 }
-export async function addItem(client, listId, { name, amount = "1", note = null }) {
-  const row = await run(
-    client.from("items").insert({ list_id: listId, name, amount, note }).select().single());
+export async function addItem(client, listId, { name, amount = "1", note = null, emoji = null }) {
+  const insert = { list_id: listId, name, amount, note };
+  if (emoji) insert.emoji = emoji;                    // auto-emoji guess; only send when we have one
+  const row = await run(client.from("items").insert(insert).select().single());
   try { await historyUpsert(client, { name, amount, note }); } catch { /* non-fatal */ }
   return row;
 }

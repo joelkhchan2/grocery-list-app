@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { categoryOf, CATEGORY_ORDER } from "../src/category.js";
+import { categoryOf, CATEGORY_ORDER, emojiOf } from "../src/category.js";
 
 test("categoryOf maps common items to sensible categories", () => {
   assert.equal(categoryOf("Bananas"), "Produce");
@@ -22,4 +22,16 @@ test("categoryOf falls back to Other for unknown items", () => {
 
 test("Other is a valid category in the order list", () => {
   assert.ok(CATEGORY_ORDER.includes("Other"));
+});
+
+test("emojiOf uses specific keyword, then category default, then null", () => {
+  assert.equal(emojiOf("Cheese"), "🧀");
+  assert.equal(emojiOf("Bananas"), "🍌");
+  assert.equal(emojiOf("Boneless skinless chicken breast"), "🍗");
+  assert.equal(emojiOf("Peanut butter"), "🥜");       // specific beats "butter"
+  assert.equal(emojiOf("Sourdough bread"), "🍞");
+  assert.equal(emojiOf("Sekka rice"), "🍚");
+  assert.equal(emojiOf("Some obscure thing"), null);   // unknown → no auto-emoji
+  // category default when no specific keyword: a Pantry item with no keyword hit
+  assert.equal(emojiOf("Cornstarch"), "🌽");           // "corn" keyword → produce corn
 });

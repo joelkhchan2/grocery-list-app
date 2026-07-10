@@ -68,3 +68,67 @@ export function categoryOf(name) {
   }
   return "Other";
 }
+
+// Keyword → emoji, ordered most-specific first (first substring match wins). Only ~130
+// food emojis exist, so this is a curated map, not a dataset. Falls back to a per-category
+// default, then to null (no auto-emoji) for genuinely unknown items.
+const EMOJI_KEYWORDS = [
+  ["ice cream", "🍦"], ["peanut butter", "🥜"], ["coconut", "🥥"], ["hot dog", "🌭"],
+  ["olive oil", "🫒"], ["ground beef", "🥩"], ["green bean", "🫘"],
+  ["toilet paper", "🧻"], ["paper towel", "🧻"], ["toothpaste", "🪥"], ["toothbrush", "🪥"],
+  ["dish soap", "🧼"], ["body wash", "🧼"], ["baby food", "🍼"], ["dog food", "🐶"], ["cat food", "🐱"],
+  // produce
+  ["banana", "🍌"], ["apple", "🍎"], ["orange", "🍊"], ["lemon", "🍋"], ["lime", "🍋"],
+  ["grape", "🍇"], ["strawberr", "🍓"], ["blueberr", "🫐"], ["raspberr", "🍓"], ["berry", "🍓"],
+  ["watermelon", "🍉"], ["melon", "🍈"], ["mango", "🥭"], ["peach", "🍑"], ["pear", "🍐"],
+  ["cherry", "🍒"], ["pineapple", "🍍"], ["avocado", "🥑"], ["eggplant", "🍆"], ["tomato", "🍅"],
+  ["potato", "🥔"], ["onion", "🧅"], ["garlic", "🧄"], ["carrot", "🥕"], ["corn", "🌽"],
+  ["broccoli", "🥦"], ["cucumber", "🥒"], ["mushroom", "🍄"], ["lettuce", "🥬"], ["spinach", "🥬"],
+  ["kale", "🥬"], ["cabbage", "🥬"], ["pepper", "🫑"], ["chili", "🌶️"], ["ginger", "🫚"],
+  // meat & seafood
+  ["chicken", "🍗"], ["turkey", "🦃"], ["bacon", "🥓"], ["steak", "🥩"], ["beef", "🥩"],
+  ["pork", "🥩"], ["lamb", "🥩"], [" ham ", "🥩"], ["sausage", "🌭"], ["shrimp", "🦐"],
+  ["salmon", "🐟"], ["tuna", "🐟"], ["tilapia", "🐟"], ["fish", "🐟"], ["cod", "🐟"], ["seafood", "🦐"],
+  // dairy & eggs
+  ["milk", "🥛"], ["cheese", "🧀"], ["egg", "🥚"], ["butter", "🧈"], ["yogurt", "🥛"],
+  ["yoghurt", "🥛"], ["cream", "🍦"],
+  // bakery
+  ["bread", "🍞"], ["bagel", "🥯"], ["croissant", "🥐"], ["baguette", "🥖"], ["pretzel", "🥨"],
+  ["muffin", "🧁"], ["cupcake", "🧁"], ["cake", "🎂"], ["waffle", "🧇"], ["pancake", "🥞"],
+  ["donut", "🍩"], ["doughnut", "🍩"], ["tortilla", "🫓"], ["pita", "🫓"], ["naan", "🫓"], ["wrap", "🌯"],
+  // pantry
+  ["pizza", "🍕"], ["fries", "🍟"], ["rice", "🍚"], ["pasta", "🍝"], ["spaghetti", "🍝"],
+  ["noodle", "🍜"], ["ramen", "🍜"], ["honey", "🍯"], ["syrup", "🍯"], ["jam", "🍯"],
+  ["salt", "🧂"], ["nut", "🥜"], ["bean", "🫘"], ["lentil", "🫘"], ["chickpea", "🫘"],
+  ["soup", "🥫"], ["broth", "🥫"], ["stock", "🥫"], ["canned", "🥫"], ["sauce", "🥫"],
+  ["ketchup", "🥫"], ["mustard", "🥫"], ["cereal", "🥣"], ["oats", "🥣"], ["oatmeal", "🥣"],
+  // snacks & candy
+  ["popcorn", "🍿"], ["chip", "🍟"], ["crisp", "🍟"], ["cookie", "🍪"], ["chocolate", "🍫"],
+  ["candy", "🍬"], ["cracker", "🍘"],
+  // beverages
+  ["water", "💧"], ["juice", "🧃"], ["soda", "🥤"], ["cola", "🥤"], [" pop ", "🥤"],
+  ["beer", "🍺"], ["wine", "🍷"], ["coffee", "☕"], ["tea", "🍵"], ["gatorade", "🥤"], ["smoothie", "🥤"],
+  // household
+  ["tissue", "🧻"], ["napkin", "🧻"], ["soap", "🧼"], ["detergent", "🧴"], ["laundry", "🧺"],
+  ["bleach", "🧽"], ["sponge", "🧽"], ["cleaner", "🧽"], ["garbage bag", "🗑️"], ["trash bag", "🗑️"],
+  // personal care
+  ["shampoo", "🧴"], ["conditioner", "🧴"], ["deodorant", "🧴"], ["razor", "🪒"], ["lotion", "🧴"],
+  ["sunscreen", "🧴"], ["floss", "🪥"], ["mouthwash", "🪥"], ["sensodyne", "🪥"],
+  ["vitamin", "💊"], ["medicine", "💊"], ["advil", "💊"], ["tylenol", "💊"], ["bandage", "🩹"],
+  // baby & pet
+  ["diaper", "🍼"], ["formula", "🍼"], ["litter", "🐱"], ["kibble", "🐾"],
+];
+
+const CATEGORY_EMOJI = {
+  "Produce": "🥦", "Meat & Seafood": "🥩", "Dairy & Eggs": "🧀", "Bakery": "🍞",
+  "Frozen": "🧊", "Pantry": "🥫", "Snacks & Candy": "🍫", "Beverages": "🥤",
+  "Household": "🧽", "Personal Care": "🧴", "Baby & Pet": "🍼",
+};
+
+// Best-guess emoji for an item name: a specific keyword match, else the category default,
+// else null (unknown → no auto-emoji rather than a wrong one).
+export function emojiOf(name) {
+  const n = ` ${String(name || "").toLowerCase()} `;
+  for (const [kw, em] of EMOJI_KEYWORDS) if (n.includes(kw)) return em;
+  return CATEGORY_EMOJI[categoryOf(name)] || null;
+}

@@ -4,6 +4,7 @@ import * as db from "./db.js";
 import { renderLists, renderListDetail, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, showEmojiPicker, setMyStores } from "./ui.js";
 import { loadPrefs, savePrefs, applyTheme, applyCustom, resolveActive } from "./theme.js";
 import { isSelfEcho, idsToClear, bySortOrder } from "./model.js";
+import { emojiOf } from "./category.js";
 
 const app = document.getElementById("app");
 const statusEl = document.getElementById("status");
@@ -92,7 +93,7 @@ const handlers = {
   onDeleteList: (id) => mutate(() => db.deleteList(client, id), [id]),
   onAddItem: (name) => {
     clearTimeout(addQueryTimer);
-    mutate(() => db.addItem(client, state.listId, { name, amount: "1", note: null }));
+    mutate(() => db.addItem(client, state.listId, { name, amount: "1", note: null, emoji: emojiOf(name) }));
   },
   onNewWatchList: (name) => mutate(() => db.createList(client, { name, is_watchlist: true })),
   onAddWatchItem: (name) => {
@@ -100,7 +101,7 @@ const handlers = {
     if (!n) return;
     // A watch-list item is a standing watch: create it, then flag watch=true so it feeds the watcher.
     mutate(async () => {
-      const row = await db.addItem(client, state.listId, { name: n, amount: "1", note: null });
+      const row = await db.addItem(client, state.listId, { name: n, amount: "1", note: null, emoji: emojiOf(n) });
       return row && row.id ? db.updateItem(client, row.id, { watch: true }) : row;
     });
   },
@@ -244,7 +245,7 @@ const handlers = {
   onPickSuggestion: (row) => {
     clearTimeout(addQueryTimer);
     mutate(() => db.addItem(client, state.listId,
-      { name: row.name, amount: row.last_amount || "1", note: row.last_note || null }));
+      { name: row.name, amount: row.last_amount || "1", note: row.last_note || null, emoji: emojiOf(row.name) }));
   },
   onPickTheme: (key) => {
     prefs = { ...prefs, theme: key };
