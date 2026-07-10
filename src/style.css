@@ -929,6 +929,46 @@ details[open] > .store-summary::before { content: "▾"; }
 .row.filtered-out,
 .store-group.filtered-out { display: none; }
 
+/* ── Bulk actions (check all / uncheck all) ──────────────────────────── */
+.bulk-actions {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0 var(--space-4) var(--space-1);
+}
+.bulk-btn {
+  min-height: 40px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  color: var(--ac);
+  font: inherit;
+  font-size: var(--fs-sub);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Drag-to-reorder handle ──────────────────────────────────────────── */
+.drag-handle {
+  flex: none;
+  width: 38px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-size: 1.2rem;
+  cursor: grab;
+  touch-action: none;   /* JS owns the drag; don't let the browser scroll/swipe */
+}
+.row.dragging {
+  position: relative;
+  z-index: 5;
+  opacity: 0.92;
+  box-shadow: var(--shadow-lg);
+}
+
 /* ── List emoji button + picker sheet ────────────────────────────────── */
 .emoji-btn {
   flex: none;

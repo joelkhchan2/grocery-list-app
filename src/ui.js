@@ -122,6 +122,59 @@ function showEmojiPicker(onPick) {
   document.body.append(overlay);
 }
 
+// Drag-to-reorder via a per-row handle. Rows are the direct children of `zone`,
+// each with data-id and a `.drag-handle` child. Dragging only starts from the
+// handle (which has touch-action:none in CSS), so it never fights list scrolling
+// or the row's swipe-to-delete. On drop, calls onReorder(idsInNewOrder) if changed.
+function enableHandleReorder(zone, onReorder) {
+  let dragEl = null;
+  let startY = 0;
+
+  const rowsWithId = () => [...zone.children].filter((c) => c.dataset && c.dataset.id);
+
+  zone.addEventListener("pointerdown", (e) => {
+    const handle = e.target.closest(".drag-handle");
+    if (!handle || !zone.contains(handle)) return;
+    const row = handle.closest("[data-id]");
+    if (!row) return;
+    e.preventDefault();
+    dragEl = row;
+    startY = e.clientY;
+    row.classList.add("dragging");
+    try { handle.setPointerCapture(e.pointerId); } catch { /* older browsers */ }
+    if (window.__glHaptic) window.__glHaptic(12);
+  });
+
+  zone.addEventListener("pointermove", (e) => {
+    if (!dragEl) return;
+    e.preventDefault();
+    dragEl.style.transform = `translateY(${e.clientY - startY}px)`;
+  });
+
+  const finish = (e) => {
+    if (!dragEl) return;
+    const dragged = dragEl;
+    const before = rowsWithId().map((r) => r.dataset.id);
+    const others = rowsWithId().filter((r) => r !== dragged);
+    const y = e.clientY;
+    const idx = others.filter((r) => {
+      const rect = r.getBoundingClientRect();
+      return rect.top + rect.height / 2 < y;
+    }).length;
+    const order = others.map((r) => r.dataset.id);
+    order.splice(idx, 0, dragged.dataset.id);
+    dragged.classList.remove("dragging");
+    dragged.style.transform = "";
+    dragEl = null;
+    if (order.join() !== before.join()) onReorder(order);
+  };
+
+  zone.addEventListener("pointerup", finish);
+  zone.addEventListener("pointercancel", () => {
+    if (dragEl) { dragEl.classList.remove("dragging"); dragEl.style.transform = ""; dragEl = null; }
+  });
+}
+
 // ── Lists home ─────────────────────────────────────────────────────────────
 export function renderLists(mount, lists, handlers) {
   mount.textContent = "";
@@ -137,11 +190,16 @@ export function renderLists(mount, lists, handlers) {
   if (!lists.length) {
     listEl.append(el("p", { class: "muted", text: "No lists yet — create one below" }));
   } else {
+    const zone = el("div", { class: "reorder-zone" });
     for (const list of bySortOrder(lists)) {
       const main = el("div", {
         class: "row-main tappable",
         on: { click: () => handlers.onOpenList(list.id) },
       });
+      main.append(el("button", {
+        type: "button", class: "drag-handle", "aria-label": "Reorder list", text: "⠿",
+        on: { click: (e) => e.stopPropagation() },
+      }));
       main.append(el("button", {
         type: "button", class: list.emoji ? "emoji-btn" : "emoji-btn placeholder",
         "aria-label": list.emoji ? "Change list emoji" : "Add list emoji", text: list.emoji || "＋",
@@ -153,6 +211,14 @@ export function renderLists(mount, lists, handlers) {
         },
       }));
       main.append(el("div", { class: "row-text" }, el("span", { class: "name", text: list.name })));
+
+      // Progress: checked / total (only when the list has items).
+      if (typeof list.item_count === "number" && list.item_count > 0) {
+        main.append(el("span", {
+          class: "count", "aria-label": "checked of total items",
+          text: `${list.checked_count || 0}/${list.item_count}`,
+        }));
+      }
 
       // Rename — stops propagation so it edits the name instead of opening the list.
       main.append(el("button", {
@@ -167,10 +233,6 @@ export function renderLists(mount, lists, handlers) {
         },
       }));
 
-      if (typeof list.item_count === "number") {
-        main.append(el("span", { class: "count", text: itemCountLabel(list.item_count) }));
-      }
-
       // Red delete panel (revealed by left-swipe). List deletion cascades its items.
       const del = el("button", {
         type: "button", class: "row-delete", text: "Delete",
@@ -183,8 +245,10 @@ export function renderLists(mount, lists, handlers) {
         },
       });
 
-      listEl.append(el("div", { class: "row" }, main, del));
+      zone.append(el("div", { class: "row", dataset: { id: list.id } }, main, del));
     }
+    listEl.append(zone);
+    enableHandleReorder(zone, (ids) => handlers.onReorderLists(ids));
   }
   mount.append(listEl);
 
@@ -239,16 +303,35 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
     });
     listEl.append(el("div", { class: "list-controls" }, sortSel, filter));
 
-    // Active items, per sort mode.
+    // Bulk actions: check all active items / uncheck all done items.
+    const bulk = el("div", { class: "bulk-actions" });
+    if (active.length) {
+      bulk.append(el("button", {
+        type: "button", class: "bulk-btn", text: "Check all",
+        on: { click: () => handlers.onCheckAll() },
+      }));
+    }
+    if (done.length) {
+      bulk.append(el("button", {
+        type: "button", class: "bulk-btn", text: "Uncheck all",
+        on: { click: () => handlers.onUncheckAll() },
+      }));
+    }
+    if (bulk.children.length) listEl.append(bulk);
+
+    // Active items, per sort mode. Manual mode allows drag-to-reorder via the handle.
     if (sortMode === "store") {
       appendGroups(listEl, groupActiveByStore(bySortOrder(active)), handlers);
     } else if (sortMode === "category") {
       appendGroups(listEl, groupActiveByCategory(bySortOrder(active)), handlers);
-    } else {
-      const ordered = sortMode === "alpha"
-        ? [...active].sort((a, b) => String(a.name).localeCompare(String(b.name)))
-        : bySortOrder(active);
+    } else if (sortMode === "alpha") {
+      const ordered = [...active].sort((a, b) => String(a.name).localeCompare(String(b.name)));
       for (const item of ordered) listEl.append(buildItemRow(item, handlers));
+    } else {
+      const zone = el("div", { class: "reorder-zone" });
+      for (const item of bySortOrder(active)) zone.append(buildItemRow(item, handlers, { drag: true }));
+      listEl.append(zone);
+      enableHandleReorder(zone, (ids) => handlers.onReorder(ids));
     }
 
     if (done.length) {
@@ -295,8 +378,14 @@ function editNotePrompt(item, handlers) {
 }
 
 // One swipe-to-delete row: .row → .row-main (100% wide) + .row-delete (revealed on left-swipe).
-function buildItemRow(item, handlers) {
+function buildItemRow(item, handlers, opts = {}) {
   const main = el("div", { class: "row-main" });
+
+  if (opts.drag) {
+    main.append(el("button", {
+      type: "button", class: "drag-handle", "aria-label": "Reorder item", text: "⠿",
+    }));
+  }
 
   // Checkbox — checked state is `box on` with NO glyph; the ✓ is drawn solely by CSS `.box.on::after`.
   main.append(el("button", {
@@ -373,7 +462,7 @@ function buildItemRow(item, handlers) {
 
   return el("div", {
     class: item.checked ? "row done" : "row",
-    dataset: { name: String(item.name || "").toLowerCase() },
+    dataset: { name: String(item.name || "").toLowerCase(), id: item.id },
   }, main, del);
 }
 
@@ -469,6 +558,15 @@ export function renderAppearance(mount, prefs, handlers) {
       class: prefs.autoDark ? "toggle on" : "toggle",
       role: "switch", "aria-checked": String(!!prefs.autoDark), "aria-label": "Match system light/dark",
       on: { click: () => handlers.onToggleAutoDark(!prefs.autoDark) },
+    })));
+
+  settings.append(el("div", { class: "toggle-row" },
+    el("span", { class: "label", text: "Haptic feedback" }),
+    el("button", {
+      type: "button",
+      class: prefs.haptics ? "toggle on" : "toggle",
+      role: "switch", "aria-checked": String(!!prefs.haptics), "aria-label": "Haptic feedback",
+      on: { click: () => handlers.onToggleHaptics(!prefs.haptics) },
     })));
 
   settings.append(el("button", {

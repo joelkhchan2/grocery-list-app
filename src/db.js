@@ -3,8 +3,15 @@ import { idsToClear, bySortOrder } from "./model.js";
 async function run(q) { const { data, error } = await q; if (error) throw error; return data; }
 
 export async function fetchLists(client) {
-  const rows = await run(client.from("lists").select("*, items(count)").order("sort_order"));
-  return bySortOrder(rows).map(r => ({ ...r, item_count: r.items?.[0]?.count ?? 0 }));
+  const lists = bySortOrder(await run(client.from("lists").select("*").order("sort_order")));
+  // One lightweight pass over items gives both total and checked counts per list (for home progress).
+  const items = (await run(client.from("items").select("list_id, checked"))) || [];
+  const total = {}, done = {};
+  for (const it of items) {
+    total[it.list_id] = (total[it.list_id] || 0) + 1;
+    if (it.checked) done[it.list_id] = (done[it.list_id] || 0) + 1;
+  }
+  return lists.map((l) => ({ ...l, item_count: total[l.id] || 0, checked_count: done[l.id] || 0 }));
 }
 export async function createList(client, { name, emoji = null }) {
   // .select().single() → return the created row (needed for self-echo id + the "returns data" contract;
@@ -56,4 +63,20 @@ export async function deleteItem(client, id) {
 }
 export async function clearChecked(client, items) {
   for (const id of idsToClear(items)) await deleteItem(client, id);
+}
+// Persist a new order: set each row's sort_order to its index.
+export async function reorderItems(client, ids) {
+  for (let i = 0; i < ids.length; i++) {
+    await run(client.from("items").update({ sort_order: i }).eq("id", ids[i]));
+  }
+}
+export async function reorderLists(client, ids) {
+  for (let i = 0; i < ids.length; i++) {
+    await run(client.from("lists").update({ sort_order: i }).eq("id", ids[i]));
+  }
+}
+// Bulk check / uncheck every item in a list (one request). .select() returns the
+// affected rows so the caller can suppress their realtime self-echoes.
+export async function checkAll(client, listId, checked) {
+  return run(client.from("items").update({ checked }).eq("list_id", listId).select());
 }

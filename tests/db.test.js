@@ -32,16 +32,23 @@ function fakeClient(canned = {}) {
   return { from: builder, _calls: calls };
 }
 
-test("fetchLists attaches item_count from the embedded count", async () => {
-  const c = fakeClient({ lists: [{ id: "l1", name: "Groceries", sort_order: 0, created_at: "a", items: [{ count: 3 }] }] });
+test("fetchLists computes item_count and checked_count from items", async () => {
+  const c = fakeClient({
+    lists: [{ id: "l1", name: "Groceries", sort_order: 0, created_at: "a" }],
+    items: [
+      { list_id: "l1", checked: false }, { list_id: "l1", checked: true }, { list_id: "l1", checked: true },
+    ],
+  });
   const lists = await fetchLists(c);
   assert.equal(lists[0].item_count, 3);
+  assert.equal(lists[0].checked_count, 2);
 });
 
-test("fetchLists defaults item_count to 0 when no items embed is present", async () => {
-  const c = fakeClient({ lists: [{ id: "l2", name: "Hardware", sort_order: 0, created_at: "a" }] });
+test("fetchLists defaults counts to 0 when a list has no items", async () => {
+  const c = fakeClient({ lists: [{ id: "l2", name: "Hardware", sort_order: 0, created_at: "a" }], items: [] });
   const lists = await fetchLists(c);
   assert.equal(lists[0].item_count, 0);
+  assert.equal(lists[0].checked_count, 0);
 });
 
 test("fetchItems selects items for a list", async () => {

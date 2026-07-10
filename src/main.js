@@ -24,6 +24,14 @@ mq.addEventListener("change", () => {
 let addQueryTimer = null;           // debounce for autocomplete queries
 let sortMode = "manual";            // per-device list sort/group: manual | alpha | store | category
 try { sortMode = localStorage.getItem("glSort") || "manual"; } catch { /* private mode */ }
+let haptics = true;                 // per-device: vibrate on check / drag (where supported)
+try { haptics = localStorage.getItem("glHaptics") !== "0"; } catch { /* private mode */ }
+
+function haptic(ms = 10) {
+  if (haptics && typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ms);
+}
+// Expose so the UI layer can buzz on drag-grab / check without importing main.
+window.__glHaptic = haptic;
 
 function setStatus(msg) {            // transient inline banner (errors / reconnecting)
   if (!statusEl) return;
@@ -52,7 +60,7 @@ async function mutate(fn, knownIds = []) {
 
 async function refresh() {
   if (state.view === "settings") {
-    renderAppearance(app, prefs, handlers);   // no data fetch needed
+    renderAppearance(app, { ...prefs, haptics }, handlers);   // no data fetch needed
     return;
   }
   if (state.view === "lists") {
@@ -76,7 +84,7 @@ const handlers = {
     clearTimeout(addQueryTimer);
     mutate(() => db.addItem(client, state.listId, { name, amount: "1", note: null }));
   },
-  onToggleCheck: (it) => mutate(() => db.updateItem(client, it.id, { checked: !it.checked }), [it.id]),
+  onToggleCheck: (it) => { haptic(8); return mutate(() => db.updateItem(client, it.id, { checked: !it.checked }), [it.id]); },
   onToggleWatch: (it) => mutate(() => db.updateItem(client, it.id, { watch: !it.watch }), [it.id]),
   onAmount: (it, amount) => mutate(() => db.updateItem(client, it.id, { amount }), [it.id]),
   onEditAmount: (it, amount) => mutate(() => db.updateItem(client, it.id, { amount }), [it.id]),
@@ -95,6 +103,16 @@ const handlers = {
     showUndo(document.body, it.name, () => mutate(() => db.reinsertItem(client, it)));
   },
   onClearChecked: (items) => mutate(() => db.clearChecked(client, items), idsToClear(items)),
+  onCheckAll: () => mutate(() => db.checkAll(client, state.listId, true)),
+  onUncheckAll: () => mutate(() => db.checkAll(client, state.listId, false)),
+  onReorder: (ids) => mutate(() => db.reorderItems(client, ids), ids),
+  onReorderLists: (ids) => mutate(() => db.reorderLists(client, ids), ids),
+  onToggleHaptics: (bool) => {
+    haptics = bool;
+    try { localStorage.setItem("glHaptics", bool ? "1" : "0"); } catch { /* private mode */ }
+    if (bool) haptic(12);
+    refresh();
+  },
   // Autocomplete: debounced history lookup that updates ONLY the #suggest dropdown.
   // Must NOT call refresh()/renderListDetail — that would rebuild the add-bar input and drop focus/caret.
   onAddQuery: (text) => {
