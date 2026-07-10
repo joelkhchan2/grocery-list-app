@@ -22,6 +22,8 @@ mq.addEventListener("change", () => {
 });
 
 let addQueryTimer = null;           // debounce for autocomplete queries
+let groupByStore = false;           // per-device: group list-detail items by store
+try { groupByStore = localStorage.getItem("glGroupByStore") === "1"; } catch { /* private mode */ }
 
 function setStatus(msg) {            // transient inline banner (errors / reconnecting)
   if (!statusEl) return;
@@ -59,7 +61,7 @@ async function refresh() {
     const lists = await db.fetchLists(client);
     const list = lists.find(l => l.id === state.listId);
     if (!list) { state = { view: "lists", listId: null }; return refresh(); }
-    renderListDetail(app, list, await db.fetchItems(client, state.listId), handlers);
+    renderListDetail(app, list, await db.fetchItems(client, state.listId), handlers, groupByStore);
   }
 }
 
@@ -81,6 +83,11 @@ const handlers = {
   onEditItem: (it, name) => mutate(() => db.updateItem(client, it.id, { name }), [it.id]),
   onEditNote: (it, note) => mutate(() => db.updateItem(client, it.id, { note }), [it.id]),
   onSetStore: (it, store) => mutate(() => db.updateItem(client, it.id, { store }), [it.id]),
+  onToggleGroupByStore: () => {
+    groupByStore = !groupByStore;
+    try { localStorage.setItem("glGroupByStore", groupByStore ? "1" : "0"); } catch { /* private mode */ }
+    refresh();
+  },
   onDeleteItem: (it) => {
     mutate(() => db.deleteItem(client, it.id), [it.id]);
     // reinsertItem (not addItem) preserves watch/checked/sort_order so an undone watch still feeds the watcher.

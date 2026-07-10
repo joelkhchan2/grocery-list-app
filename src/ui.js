@@ -46,6 +46,28 @@ function buildStoreSelect(item, handlers) {
   return sel;
 }
 
+// Group items by store for the "group by store" view. Returns ordered groups:
+// the household's stores first (in MY_STORES order), then other known/custom
+// stores (alphabetical), then a "No store" group last. Item order within a
+// group is preserved (callers pass an already-sorted array).
+function groupActiveByStore(items) {
+  const byStore = new Map();
+  for (const it of items) {
+    const key = it.store || "";
+    if (!byStore.has(key)) byStore.set(key, []);
+    byStore.get(key).push(it);
+  }
+  const groups = [];
+  for (const s of [...MY_STORES, ...OTHER_STORES]) {
+    if (byStore.has(s)) { groups.push({ label: s, items: byStore.get(s) }); byStore.delete(s); }
+  }
+  for (const s of [...byStore.keys()].filter((k) => k !== "").sort()) {
+    groups.push({ label: s, items: byStore.get(s) }); byStore.delete(s);
+  }
+  if (byStore.has("")) groups.push({ label: "No store", items: byStore.get("") });
+  return groups;
+}
+
 // ── Lists home ─────────────────────────────────────────────────────────────
 export function renderLists(mount, lists, handlers) {
   mount.textContent = "";
@@ -109,7 +131,7 @@ export function renderLists(mount, lists, handlers) {
 }
 
 // ── List detail ─────────────────────────────────────────────────────────────
-export function renderListDetail(mount, list, items, handlers) {
+export function renderListDetail(mount, list, items, handlers, groupByStore = false) {
   mount.textContent = "";
 
   mount.append(el("div", { class: "bar" },
@@ -130,7 +152,31 @@ export function renderListDetail(mount, list, items, handlers) {
     const sorted = bySortOrder(items);
     const active = sorted.filter((i) => !i.checked);
     const done = sorted.filter((i) => i.checked);
-    for (const item of active) listEl.append(buildItemRow(item, handlers));
+
+    if (active.length) {
+      listEl.append(el("div", { class: "group-toggle" },
+        el("span", { class: "label", text: "Group by store" }),
+        el("button", {
+          type: "button", class: groupByStore ? "toggle on" : "toggle",
+          "aria-label": "Group by store", "aria-pressed": String(!!groupByStore),
+          on: { click: () => handlers.onToggleGroupByStore() },
+        })));
+    }
+
+    if (groupByStore && active.length) {
+      for (const grp of groupActiveByStore(active)) {
+        const body = el("div", { class: "store-group-body" });
+        for (const item of grp.items) body.append(buildItemRow(item, handlers));
+        listEl.append(el("details", { class: "store-group", open: "" },
+          el("summary", { class: "store-summary" },
+            el("span", { text: grp.label }),
+            el("span", { class: "store-count", text: String(grp.items.length) })),
+          body));
+      }
+    } else {
+      for (const item of active) listEl.append(buildItemRow(item, handlers));
+    }
+
     if (done.length) {
       listEl.append(el("div", { class: "done-divider" },
         el("span", { text: `Done · ${done.length}` }),

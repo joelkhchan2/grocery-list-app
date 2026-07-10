@@ -867,3 +867,30 @@ body {
   cursor: pointer;
 }
 .store-select.set { color: var(--tx); font-weight: 600; }
+
+/* ── Group by store ──────────────────────────────────────────────────── */
+.group-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-2) var(--space-4) 0;
+}
+.group-toggle .label { flex: 1; color: var(--sub); font-size: var(--fs-sub); }
+.store-group { margin: 0; }
+.store-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4) var(--space-1);
+  color: var(--sub);
+  font-size: var(--fs-sub);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  list-style: none;
+}
+.store-summary::-webkit-details-marker { display: none; }
+.store-summary::before { content: "▸"; font-size: 0.9em; }
+details[open] > .store-summary::before { content: "▾"; }
+.store-count { margin-left: auto; }
