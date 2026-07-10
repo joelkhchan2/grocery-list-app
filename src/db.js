@@ -84,12 +84,14 @@ export async function checkAll(client, listId, checked) {
 export async function moveItem(client, id, listId) {
   return run(client.from("items").update({ list_id: listId }).eq("id", id).select().single());
 }
-// Duplicate a list and its items into a new "<name> (copy)" list (items reset to unchecked).
-export async function duplicateList(client, listId) {
+// Copy a list + its items into a new list (items reset to unchecked). Shared by
+// duplicate / save-as-template / use-template.
+async function copyList(client, listId, { isTemplate = false, suffix = "" }) {
   const src = (await run(client.from("lists").select("*").eq("id", listId)))?.[0];
   if (!src) return null;
-  const newList = await run(
-    client.from("lists").insert({ name: `${src.name} (copy)`, emoji: src.emoji }).select().single());
+  const newList = await run(client.from("lists")
+    .insert({ name: `${src.name}${suffix}`, emoji: src.emoji, is_template: isTemplate })
+    .select().single());
   const items = (await run(client.from("items").select("*").eq("list_id", listId))) || [];
   if (items.length) {
     await run(client.from("items").insert(items.map((it) => ({
@@ -99,3 +101,6 @@ export async function duplicateList(client, listId) {
   }
   return newList;
 }
+export function duplicateList(client, listId) { return copyList(client, listId, { suffix: " (copy)" }); }
+export function saveAsTemplate(client, listId) { return copyList(client, listId, { isTemplate: true }); }
+export function useTemplate(client, templateId) { return copyList(client, templateId, { isTemplate: false }); }

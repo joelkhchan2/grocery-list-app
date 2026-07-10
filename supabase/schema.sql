@@ -4,6 +4,7 @@ create table lists (
   name text not null,
   emoji text,
   sort_order int not null default 0,
+  is_template boolean not null default false,   -- true = a reusable template, hidden from the main lists
   created_by uuid default auth.uid(),   -- who added it (for future "who added this" UI); null for admin/dashboard inserts
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

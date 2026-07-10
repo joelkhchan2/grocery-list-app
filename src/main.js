@@ -66,7 +66,7 @@ async function refresh() {
   }
   if (state.view === "lists") {
     lastLists = await db.fetchLists(client);
-    renderLists(app, lastLists, handlers);
+    renderLists(app, lastLists.filter(l => !l.is_template), lastLists.filter(l => l.is_template), handlers);
   } else {
     lastLists = await db.fetchLists(client);
     const list = lastLists.find(l => l.id === state.listId);
@@ -111,8 +111,10 @@ const handlers = {
   onReorderLists: (ids) => mutate(() => db.reorderLists(client, ids), ids),
   onMoveItem: (it, listId) => mutate(() => db.moveItem(client, it.id, listId), [it.id]),
   onDuplicateList: (id) => mutate(() => db.duplicateList(client, id)),
+  onSaveTemplate: (id) => mutate(() => db.saveAsTemplate(client, id)),
+  onUseTemplate: (id) => mutate(() => db.useTemplate(client, id)),
   onItemMenu: (it) => {
-    const targets = lastLists.filter((l) => l.id !== state.listId);
+    const targets = lastLists.filter((l) => l.id !== state.listId && !l.is_template);
     if (!targets.length) { setStatus("No other list to move to."); return; }
     showSheet(`Move "${it.name}" to…`, targets.map((l) => ({
       label: (l.emoji ? l.emoji + " " : "") + l.name,
@@ -127,6 +129,7 @@ const handlers = {
           if (t && t !== list.name) handlers.onRenameList(list.id, t);
         } },
       { label: "Duplicate list", onClick: () => handlers.onDuplicateList(list.id) },
+      { label: "Save as template", onClick: () => handlers.onSaveTemplate(list.id) },
     ]);
   },
   onToggleHaptics: (bool) => {

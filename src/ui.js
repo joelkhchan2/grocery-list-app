@@ -196,7 +196,7 @@ function enableHandleReorder(zone, onReorder) {
 }
 
 // ── Lists home ─────────────────────────────────────────────────────────────
-export function renderLists(mount, lists, handlers) {
+export function renderLists(mount, lists, templates, handlers) {
   mount.textContent = "";
 
   mount.append(el("div", { class: "bar" },
@@ -262,6 +262,28 @@ export function renderLists(mount, lists, handlers) {
     }
     listEl.append(zone);
     enableHandleReorder(zone, (ids) => handlers.onReorderLists(ids));
+  }
+
+  // Templates section: tap "Use" to spin up a fresh copy as a normal list.
+  if (templates && templates.length) {
+    const tbody = el("div", { class: "store-group-body" });
+    for (const t of templates) {
+      const main = el("div", { class: "row-main" },
+        el("span", { class: "emoji-btn", text: t.emoji || "📋" }),
+        el("div", { class: "row-text" }, el("span", { class: "name", text: t.name })),
+        el("button", {
+          type: "button", class: "bulk-btn", text: "Use",
+          on: { click: () => handlers.onUseTemplate(t.id) },
+        }));
+      const del = el("button", {
+        type: "button", class: "row-delete", text: "Delete",
+        on: { click: () => { if (confirm(`Delete template "${t.name}"?`)) handlers.onDeleteList(t.id); } },
+      });
+      tbody.append(el("div", { class: "row", dataset: { id: t.id } }, main, del));
+    }
+    listEl.append(el("details", { class: "store-group", open: "" },
+      el("summary", { class: "store-summary" }, el("span", { text: `Templates · ${templates.length}` })),
+      tbody));
   }
   mount.append(listEl);
 
