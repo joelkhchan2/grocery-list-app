@@ -341,8 +341,13 @@ export function renderLists(mount, lists, templates, handlers) {
       }));
       main.append(el("div", { class: "row-text" }, el("span", { class: "name", text: list.name })));
 
-      // Progress: checked / total (only when the list has items).
-      if (typeof list.item_count === "number" && list.item_count > 0) {
+      // Watch lists show a 🎯 count ("watching N"); shopping lists show checked / total.
+      if (list.is_watchlist) {
+        main.append(el("span", {
+          class: "count watch-count", "aria-label": "items watched",
+          text: `🎯 ${list.item_count || 0}`,
+        }));
+      } else if (typeof list.item_count === "number" && list.item_count > 0) {
         main.append(el("span", {
           class: "count", "aria-label": "checked of total items",
           text: `${list.checked_count || 0}/${list.item_count}`,
@@ -391,6 +396,16 @@ export function renderLists(mount, lists, templates, handlers) {
       el("summary", { class: "store-summary" }, el("span", { text: `Templates · ${templates.length}` })),
       tbody));
   }
+  // Secondary action: create a Watches list (standing "alert me under $X" items).
+  listEl.append(el("button", {
+    type: "button", class: "new-watchlist-btn", text: "🎯 New watch list",
+    on: {
+      click: () => showPrompt("Name your watch list", "Watches", (v) => {
+        const t = (v || "").trim();
+        if (t) handlers.onNewWatchList(t);
+      }),
+    },
+  }));
   mount.append(listEl);
 
   mount.append(makeAddBar("New list…", "＋ New list", {
@@ -412,6 +427,26 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
       type: "button", class: "icon-btn", "aria-label": "Settings",
       on: { click: () => handlers.onOpenSettings() },
     }, icon("settings"))));
+
+  // Watch list: a distinct, simpler view — no checkboxes/steppers/clear; each row is a
+  // standing "alert me under $X" watch. Same frame, watch-native rows.
+  if (list.is_watchlist) {
+    const watchEl = el("div", { class: "list" });
+    if (!items.length) {
+      watchEl.append(el("p", { class: "muted",
+        text: "No watches yet — add one below and set a price to get alerted when a store hits it." }));
+    } else {
+      const zone = el("div", { class: "reorder-zone" });
+      for (const item of bySortOrder(items)) zone.append(buildWatchRow(item, handlers));
+      watchEl.append(zone);
+      enableHandleReorder(zone, (ids) => handlers.onReorder(ids));
+    }
+    mount.append(watchEl);
+    mount.append(makeAddBar("Add a watch…", "＋", {
+      onSubmit: (name) => handlers.onAddWatchItem(name),
+    }));
+    return;
+  }
 
   const listEl = el("div", { class: "list" });
   if (!items.length) {
@@ -643,6 +678,51 @@ function buildItemRow(item, handlers, opts = {}) {
   main.append(el("button", {
     type: "button", class: "icon-btn", "aria-label": "Item actions",
     on: { click: () => handlers.onItemMenu(item) },
+  }, icon("more")));
+
+  return el("div", {
+    class: "row", dataset: { name: String(item.name || "").toLowerCase(), id: item.id },
+  }, main, del);
+}
+
+// A watch row: name + target-price chip + store chip. No checkbox/stepper (a watch is
+// never "bought"); the ⋯ menu holds pause/resume + set price. Swipe-to-delete like other rows.
+function buildWatchRow(item, handlers) {
+  const del = el("button", {
+    type: "button", class: "row-delete", text: "Delete",
+    on: { click: () => handlers.onDeleteItem(item) },
+  });
+  const main = el("div", { class: "row-main" });
+  main.append(el("span", { class: "drag-handle", "aria-hidden": "true" }, icon("drag", 20)));
+
+  const text = el("div", { class: "row-text" },
+    el("span", {
+      class: item.watch ? "name" : "name paused", text: item.name,
+      on: {
+        click: (e) => inlineEdit(e.currentTarget, item.name, (v) => {
+          const t = (v || "").trim();
+          if (t && t !== item.name) handlers.onEditItem(item, t);
+        }),
+      },
+    }));
+
+  const targetChip = el("button", {
+    type: "button", class: item.target_price != null ? "target-chip set" : "target-chip",
+    text: item.target_price != null ? `🎯 ≤ $${Number(item.target_price).toFixed(2)}` : "🎯 Set price",
+    "aria-label": "Set deal price",
+    on: {
+      click: () => showPrompt("Alert me at or under ($)",
+        item.target_price != null ? String(item.target_price) : "",
+        (v) => handlers.onSetTargetPrice(item, v), { placeholder: "e.g. 4.00 — blank to clear" }),
+    },
+  });
+  text.append(el("div", { class: "meta-line" }, targetChip, buildStoreChip(item, handlers)));
+  if (!item.watch) text.append(el("span", { class: "note", text: "paused — not alerting" }));
+  main.append(text);
+
+  main.append(el("button", {
+    type: "button", class: "icon-btn", "aria-label": "Watch actions",
+    on: { click: () => handlers.onWatchItemMenu(item) },
   }, icon("more")));
 
   return el("div", {

@@ -999,6 +999,37 @@ body {
   font-weight: 600;
   white-space: nowrap;
 }
+/* Watch list: target-price chip (primary control on a watch row), home count, create button. */
+.target-chip {
+  flex: none;
+  min-height: 32px;
+  padding: 3px 12px;
+  background: none;
+  border: 1px solid var(--ac);
+  border-radius: var(--r-pill);
+  color: var(--ac);
+  font: inherit;
+  font-size: var(--fs-sub);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.target-chip.set { background: var(--ac); color: var(--card); }
+.watch-count { color: var(--ac); font-weight: 600; }
+.name.paused { opacity: 0.5; }
+.new-watchlist-btn {
+  display: block;
+  width: 100%;
+  margin: var(--space-3) 0 var(--space-2);
+  padding: var(--space-2);
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-card);
+  color: var(--ac);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
 
 /* My-stores editor (Appearance) */
 .store-edit {

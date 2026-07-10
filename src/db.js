@@ -13,10 +13,14 @@ export async function fetchLists(client) {
   }
   return lists.map((l) => ({ ...l, item_count: total[l.id] || 0, checked_count: done[l.id] || 0 }));
 }
-export async function createList(client, { name, emoji = null }) {
+export async function createList(client, { name, emoji = null, is_watchlist = false }) {
   // .select().single() → return the created row (needed for self-echo id + the "returns data" contract;
   // supabase-js defaults to return=minimal / null data without .select()).
-  return run(client.from("lists").insert({ name, emoji }).select().single());
+  // Only send is_watchlist when true so normal list creation still works if the column
+  // migration hasn't run yet (unknown-column errors otherwise).
+  const row = { name, emoji };
+  if (is_watchlist) row.is_watchlist = true;
+  return run(client.from("lists").insert(row).select().single());
 }
 export async function renameList(client, id, name) {
   return run(client.from("lists").update({ name }).eq("id", id).select().single());

@@ -93,6 +93,16 @@ const handlers = {
     clearTimeout(addQueryTimer);
     mutate(() => db.addItem(client, state.listId, { name, amount: "1", note: null }));
   },
+  onNewWatchList: (name) => mutate(() => db.createList(client, { name, is_watchlist: true })),
+  onAddWatchItem: (name) => {
+    const n = (name || "").trim();
+    if (!n) return;
+    // A watch-list item is a standing watch: create it, then flag watch=true so it feeds the watcher.
+    mutate(async () => {
+      const row = await db.addItem(client, state.listId, { name: n, amount: "1", note: null });
+      return row && row.id ? db.updateItem(client, row.id, { watch: true }) : row;
+    });
+  },
   onToggleCheck: (it) => { haptic(8); return mutate(() => db.updateItem(client, it.id, { checked: !it.checked }), [it.id]); },
   onToggleWatch: (it) => mutate(() => db.updateItem(client, it.id, { watch: !it.watch }), [it.id]),
   onAmount: (it, amount) => mutate(() => db.updateItem(client, it.id, { amount }), [it.id]),
@@ -162,6 +172,17 @@ const handlers = {
       } });
     }
     showSheet(it.name, opts);
+  },
+  onWatchItemMenu: (it) => {
+    showSheet(it.name, [
+      { label: it.watch ? "⏸ Pause alerts" : "▶ Resume alerts", onClick: () => handlers.onToggleWatch(it) },
+      { label: it.target_price != null
+          ? `🎯 Deal price: $${Number(it.target_price).toFixed(2)} (edit)`
+          : "🎯 Set deal price",
+        onClick: () => showPrompt("Alert me at or under ($)",
+          it.target_price != null ? String(it.target_price) : "",
+          (v) => handlers.onSetTargetPrice(it, v), { placeholder: "e.g. 4.00 — blank to clear" }) },
+    ]);
   },
   onListMenu: (list) => {
     showSheet(list.name, [
