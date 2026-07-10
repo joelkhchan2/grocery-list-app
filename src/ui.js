@@ -30,22 +30,14 @@ const MY_STORES = ["No Frills", "FreshCo", "Walmart", "Real Canadian Superstore"
 const OTHER_STORES = ["Costco", "T&T", "Loblaws", "Metro", "Sobeys", "Longo's", "Farm Boy",
   "Fortinos", "Shoppers Drug Mart", "Adonis", "Btrust", "Bulk Barn", "Dollarama", "Whole Foods"];
 
-// A native <select> for the item's store (real mobile picker). Empty = no store set.
-function buildStoreSelect(item, handlers) {
-  const mine = el("optgroup", { label: "My stores" });
-  for (const s of MY_STORES) mine.append(el("option", { value: s, text: s }));
-  const other = el("optgroup", { label: "Other stores" });
-  for (const s of OTHER_STORES) other.append(el("option", { value: s, text: s }));
-  const sel = el("select",
-    { class: item.store ? "store-select set" : "store-select", "aria-label": "Store" },
-    el("option", { value: "", text: "🛒 Store" }), mine, other);
-  // Include an option for a legacy value not in the lists, so it still displays.
-  if (item.store && !MY_STORES.includes(item.store) && !OTHER_STORES.includes(item.store)) {
-    sel.append(el("option", { value: item.store, text: item.store }));
-  }
-  sel.value = item.store || "";
-  sel.addEventListener("change", () => handlers.onSetStore(item, sel.value || null));
-  return sel;
+// Tappable store chip → opens the styled store picker. Empty = no store set.
+function buildStoreChip(item, handlers) {
+  return el("button", {
+    type: "button", class: item.store ? "store-chip set" : "store-chip",
+    "aria-label": item.store ? `Store: ${item.store}` : "Set store",
+    text: item.store ? `🛒 ${item.store}` : "🛒 Store",
+    on: { click: () => showStorePicker(item.store || null, (s) => handlers.onSetStore(item, s)) },
+  });
 }
 
 // Append collapsible <details> sections for pre-built groups to a container.
@@ -174,6 +166,57 @@ export function showConfirm(title, message, onConfirm, { confirmLabel = "Delete"
       el("button", { type: "button", class: "prompt-cancel", text: "Cancel", on: { click: () => overlay.remove() } }),
       el("button", { type: "button", class: "prompt-save danger", text: confirmLabel,
         on: { click: () => { overlay.remove(); onConfirm(); } } }))));
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.append(overlay);
+}
+
+// Inline edit: swap a display element for a text input in place. Commits on
+// Enter/blur (only when changed), restores on Escape / no-change. A committing
+// change triggers a re-render that replaces the whole row.
+function inlineEdit(displayEl, value, commit, { placeholder = "" } = {}) {
+  const orig = value == null ? "" : String(value);
+  const input = el("input", { type: "text", class: "inline-input", value: orig, placeholder });
+  let closed = false;
+  const close = (save) => {
+    if (closed) return;
+    closed = true;
+    if (save && input.value.trim() !== orig.trim()) commit(input.value);
+    else input.replaceWith(displayEl);          // no change / cancel → restore display
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); close(true); }
+    else if (e.key === "Escape") { e.preventDefault(); close(false); }
+  });
+  input.addEventListener("blur", () => close(true));
+  displayEl.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+// Styled store picker (replaces the native <select>): My stores group, then Other.
+function showStorePicker(current, onPick) {
+  const prev = document.querySelector(".emoji-overlay");
+  if (prev) prev.remove();
+  const overlay = el("div", { class: "emoji-overlay" });
+  const body = el("div", { class: "store-picker" });
+  const group = (label, stores) => {
+    body.append(el("div", { class: "store-group-label", text: label }));
+    for (const s of stores) {
+      body.append(el("button", {
+        type: "button", class: s === current ? "store-opt on" : "store-opt", text: s,
+        on: { click: () => { overlay.remove(); onPick(s); } },
+      }));
+    }
+  };
+  group("My stores", MY_STORES);
+  group("Other stores", OTHER_STORES);
+  overlay.append(el("div", { class: "emoji-sheet" },
+    el("div", { class: "emoji-title", text: "Store" }),
+    body,
+    el("button", {
+      type: "button", class: "emoji-clear", text: current ? "Remove store" : "Cancel",
+      on: { click: () => { overlay.remove(); if (current) onPick(null); } },
+    })));
   overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.append(overlay);
 }
@@ -433,6 +476,22 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
     listEl.append(el("div", { class: "usuals-wrap" },
       el("div", { class: "usuals-label", text: "Your usuals" }), row));
   }
+  // One-time swipe hint (per session, motion-safe): briefly reveal the first row's
+  // delete panel so users discover swipe-to-delete, then snap back.
+  try {
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduce && !sessionStorage.getItem("gl-swipe-hinted")) {
+      const firstRow = listEl.querySelector(".row");
+      if (firstRow && firstRow.scrollTo) {
+        sessionStorage.setItem("gl-swipe-hinted", "1");
+        setTimeout(() => {
+          firstRow.scrollTo({ left: 46, behavior: "smooth" });
+          setTimeout(() => firstRow.scrollTo({ left: 0, behavior: "smooth" }), 650);
+        }, 450);
+      }
+    }
+  } catch { /* no sessionStorage / scrollTo */ }
+
   mount.append(listEl);
 
   mount.append(makeAddBar("Add item…", "＋", {
@@ -440,23 +499,6 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
     onInput: (value) => handlers.onAddQuery(value),
     onSubmit: (name) => handlers.onAddItem(name),
   }));
-}
-
-// Prompt to edit an item's amount as free text ("2", "500 g", "2 L"). Works from
-// the numeric stepper too, so a plain count can be turned into "500 g".
-function editAmountPrompt(item, handlers) {
-  showPrompt("Amount", item.amount || "", (v) => {
-    const t = (v || "").trim();
-    if (t && t !== String(item.amount || "").trim()) handlers.onEditAmount(item, t);
-  }, { placeholder: "e.g. 2, 500 g, 2 L" });
-}
-
-// Add / edit / clear an item's note. Blank input removes the note.
-function editNotePrompt(item, handlers) {
-  showPrompt("Note", item.note || "", (v) => {
-    const t = (v || "").trim();
-    handlers.onEditNote(item, t === "" ? null : t);
-  }, { placeholder: "leave blank to remove" });
 }
 
 // One swipe-to-delete row: .row → .row-main (100% wide) + .row-delete (revealed on left-swipe).
@@ -498,7 +540,7 @@ function buildItemRow(item, handlers, opts = {}) {
     el("span", {
       class: "name", text: item.name,
       on: {
-        click: () => showPrompt("Edit item", item.name, (v) => {
+        click: (e) => inlineEdit(e.currentTarget, item.name, (v) => {
           const t = (v || "").trim();
           if (t && t !== item.name) handlers.onEditItem(item, t);
         }),
@@ -513,13 +555,13 @@ function buildItemRow(item, handlers, opts = {}) {
     }));
   }
   if (item.watch) meta.append(el("span", { class: "watch-flag", text: "🔔 watch" }));
-  meta.append(buildStoreSelect(item, handlers));
+  meta.append(buildStoreChip(item, handlers));
   if (item.note) {
     meta.append(el("span", { class: "note", text: item.note,
-      on: { click: () => editNotePrompt(item, handlers) } }));
+      on: { click: (e) => inlineEdit(e.currentTarget, item.note, (v) => handlers.onEditNote(item, v.trim() || null)) } }));
   } else {
     meta.append(el("button", { type: "button", class: "add-note", text: "+ note",
-      on: { click: () => editNotePrompt(item, handlers) } }));
+      on: { click: (e) => inlineEdit(e.currentTarget, "", (v) => { const t = v.trim(); if (t) handlers.onEditNote(item, t); }, { placeholder: "note" }) } }));
   }
   text.append(meta);
   main.append(text);
@@ -531,12 +573,12 @@ function buildItemRow(item, handlers, opts = {}) {
       el("button", { type: "button", class: "step", "aria-label": "Fewer", text: "−",
         on: { click: () => handlers.onAmount(item, stepAmount(item.amount, -1)) } }),
       el("span", { class: "amount editable", text: String(item.amount).trim(), "aria-label": "Edit amount",
-        on: { click: () => editAmountPrompt(item, handlers) } }),
+        on: { click: (e) => inlineEdit(e.currentTarget, item.amount, (v) => { const t = v.trim(); if (t && t !== String(item.amount).trim()) handlers.onEditAmount(item, t); }, { placeholder: "e.g. 500 g" }) } }),
       el("button", { type: "button", class: "step", "aria-label": "More", text: "+",
         on: { click: () => handlers.onAmount(item, stepAmount(item.amount, +1)) } })));
   } else {
     main.append(el("span", { class: "amount editable", text: item.amount || "", "aria-label": "Edit amount",
-      on: { click: () => editAmountPrompt(item, handlers) } }));
+      on: { click: (e) => inlineEdit(e.currentTarget, item.amount, (v) => { const t = v.trim(); if (t && t !== String(item.amount || "").trim()) handlers.onEditAmount(item, t); }, { placeholder: "e.g. 500 g" }) } }));
   }
 
   // Overflow menu (watch toggle · move to list · move up/down). Keeps the row uncluttered.

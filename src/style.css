@@ -867,6 +867,62 @@ body {
   cursor: pointer;
 }
 .store-select.set { color: var(--tx); font-weight: 600; }
+
+/* Store chip (opens the styled store picker) */
+.store-chip {
+  flex: none;
+  max-width: 45vw;
+  min-height: 32px;
+  padding: 3px 10px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  color: var(--sub);
+  font: inherit;
+  font-size: var(--fs-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.store-chip.set { color: var(--tx); border-color: var(--ac); }
+
+/* Inline editing input (name / amount / note in place) */
+.inline-input {
+  width: 100%;
+  min-width: 60px;
+  font: inherit;
+  color: var(--tx);
+  background: var(--bg);
+  border: 1px solid var(--ac);
+  border-radius: 8px;
+  padding: 2px 6px;
+}
+
+/* Store picker sheet */
+.store-picker { display: flex; flex-direction: column; }
+.store-group-label {
+  color: var(--sub);
+  font-size: var(--fs-sub);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: var(--space-2) 0 var(--space-1);
+}
+.store-opt {
+  min-height: 48px;
+  text-align: left;
+  padding: 0 var(--space-2);
+  background: none;
+  border: none;
+  color: var(--tx);
+  font: inherit;
+  font-size: var(--fs-ctl);
+  cursor: pointer;
+  border-radius: var(--r-ctl);
+}
+.store-opt.on { color: var(--ac); font-weight: 700; }
+.store-opt:active { background: var(--bg); }
 .watch-flag { flex: none; font-size: var(--fs-sub); color: var(--ac); font-weight: 600; white-space: nowrap; }
 
 /* ── Prompt / confirm dialogs (reuse .emoji-overlay / .emoji-sheet) ───── */
