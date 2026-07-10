@@ -257,9 +257,11 @@ function showStorePicker(current, onPick) {
 // or the row's swipe-to-delete. On drop, calls onReorder(idsInNewOrder) if changed.
 function enableHandleReorder(zone, onReorder) {
   let dragEl = null;
-  let startY = 0;
+  let startY = 0;            // pointer Y that maps to the dragged row's resting position
+  let startOrder = [];
 
   const rowsWithId = () => [...zone.children].filter((c) => c.dataset && c.dataset.id);
+  const settle = () => rowsWithId().forEach((r) => { r.style.transition = ""; r.style.transform = ""; });
 
   zone.addEventListener("pointerdown", (e) => {
     const handle = e.target.closest(".drag-handle");
@@ -269,6 +271,7 @@ function enableHandleReorder(zone, onReorder) {
     e.preventDefault();
     dragEl = row;
     startY = e.clientY;
+    startOrder = rowsWithId().map((r) => r.dataset.id);
     row.classList.add("dragging");
     try { handle.setPointerCapture(e.pointerId); } catch { /* older browsers */ }
     if (window.__glHaptic) window.__glHaptic(12);
@@ -278,29 +281,56 @@ function enableHandleReorder(zone, onReorder) {
     if (!dragEl) return;
     e.preventDefault();
     dragEl.style.transform = `translateY(${e.clientY - startY}px)`;
+
+    // Which sibling should the dragged row now sit before? (null = drop at the end)
+    const siblings = rowsWithId().filter((r) => r !== dragEl);
+    let insertBefore = null;
+    for (const r of siblings) {
+      const rect = r.getBoundingClientRect();
+      if (e.clientY < rect.top + rect.height / 2) { insertBefore = r; break; }
+    }
+    if (insertBefore === dragEl.nextElementSibling) return;   // already in place
+
+    // FLIP: record neighbour positions, move the dragged node, then animate the
+    // displaced rows from their old spot to the new one so the gap opens smoothly.
+    const firstTops = new Map(siblings.map((r) => [r, r.getBoundingClientRect().top]));
+    const visualTop = dragEl.getBoundingClientRect().top;     // includes the finger offset
+    zone.insertBefore(dragEl, insertBefore);
+    dragEl.style.transform = "";
+    const layoutTop = dragEl.getBoundingClientRect().top;     // new resting position
+    startY = e.clientY - (visualTop - layoutTop);             // keep it under the finger (no jump)
+    dragEl.style.transform = `translateY(${e.clientY - startY}px)`;
+
+    for (const r of siblings) {
+      const delta = firstTops.get(r) - r.getBoundingClientRect().top;
+      if (!delta) continue;
+      r.style.transition = "none";
+      r.style.transform = `translateY(${delta}px)`;
+      requestAnimationFrame(() => {
+        r.style.transition = "transform 160ms ease";
+        r.style.transform = "";
+      });
+    }
   });
 
-  const finish = (e) => {
+  const finish = () => {
     if (!dragEl) return;
-    const dragged = dragEl;
-    const before = rowsWithId().map((r) => r.dataset.id);
-    const others = rowsWithId().filter((r) => r !== dragged);
-    const y = e.clientY;
-    const idx = others.filter((r) => {
-      const rect = r.getBoundingClientRect();
-      return rect.top + rect.height / 2 < y;
-    }).length;
-    const order = others.map((r) => r.dataset.id);
-    order.splice(idx, 0, dragged.dataset.id);
-    dragged.classList.remove("dragging");
-    dragged.style.transform = "";
+    dragEl.classList.remove("dragging");
     dragEl = null;
-    if (order.join() !== before.join()) onReorder(order);
+    const order = rowsWithId().map((r) => r.dataset.id);   // DOM already reflects the new order
+    settle();
+    if (order.join() !== startOrder.join()) onReorder(order);
   };
 
   zone.addEventListener("pointerup", finish);
   zone.addEventListener("pointercancel", () => {
-    if (dragEl) { dragEl.classList.remove("dragging"); dragEl.style.transform = ""; dragEl = null; }
+    if (!dragEl) return;
+    dragEl.classList.remove("dragging");
+    dragEl = null;
+    // Cancelled mid-drag: restore the original DOM order, commit nothing.
+    const byId = new Map(rowsWithId().map((r) => [r.dataset.id, r]));
+    startOrder.forEach((id) => { const r = byId.get(id); if (r) zone.appendChild(r); });
+    settle();
   });
 }
 
