@@ -180,13 +180,14 @@ export function showSheet(title, options) {
 }
 
 // Styled text-input dialog (replaces native prompt). onSubmit(value) on Save.
-export function showPrompt(title, value, onSubmit, { placeholder = "" } = {}) {
+export function showPrompt(title, value, onSubmit, { placeholder = "", hint = "" } = {}) {
   const prev = document.querySelector(".emoji-overlay");
   if (prev) prev.remove();
   const overlay = el("div", { class: "emoji-overlay" });
   const input = el("input", { type: "text", class: "prompt-input", value: value || "", placeholder });
   const form = el("form", { class: "emoji-sheet" },
     el("div", { class: "emoji-title", text: title }),
+    hint ? el("p", { class: "confirm-msg", text: hint }) : null,
     input,
     el("div", { class: "prompt-actions" },
       el("button", { type: "button", class: "prompt-cancel", text: "Cancel", on: { click: () => overlay.remove() } }),

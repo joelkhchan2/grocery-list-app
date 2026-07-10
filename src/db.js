@@ -65,6 +65,22 @@ export async function topItems(client, limit = 12) {
   return (await run(client.from("item_history").select("*")
     .order("last_used", { ascending: false }).limit(limit))) || [];
 }
+// Price-history stats for an item (from the watcher's weekly log): cheapest + median over
+// the last year of observations. Returns null when there's no history yet.
+export async function priceStats(client, name) {
+  const key = String(name || "").trim().toLowerCase();
+  if (!key) return null;
+  const rows = await run(client.from("price_history").select("price, unit, observed_on")
+    .eq("item_key", key).order("observed_on", { ascending: false }).limit(52));
+  const prices = (rows || []).map((r) => Number(r.price)).filter((n) => isFinite(n)).sort((a, b) => a - b);
+  if (!prices.length) return null;
+  return {
+    min: prices[0],
+    median: prices[Math.floor(prices.length / 2)],
+    count: prices.length,
+    unit: (rows.find((r) => r.unit) || {}).unit || null,
+  };
+}
 export async function updateItem(client, id, patch) {
   return run(client.from("items").update(patch).eq("id", id).select().single());
 }

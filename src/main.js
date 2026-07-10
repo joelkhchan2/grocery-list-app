@@ -187,9 +187,16 @@ const handlers = {
       { label: it.target_price != null
           ? `🎯 Deal price: $${Number(it.target_price).toFixed(2)} (edit)`
           : "🎯 Set deal price",
-        onClick: () => showPrompt("Alert me at or under ($)",
-          it.target_price != null ? String(it.target_price) : "",
-          (v) => handlers.onSetTargetPrice(it, v), { placeholder: "e.g. 4.00 — blank to clear" }) },
+        onClick: async () => {
+          const s = await db.priceStats(client, it.name).catch(() => null);
+          const u = s && s.unit ? "/" + s.unit : "";
+          const hint = s
+            ? `Seen as low as $${s.min.toFixed(2)}${u} · median $${s.median.toFixed(2)}${u} over ${s.count} week${s.count === 1 ? "" : "s"}`
+            : "No price history yet — the watcher logs prices each week.";
+          showPrompt("Alert me at or under ($)",
+            it.target_price != null ? String(it.target_price) : "",
+            (v) => handlers.onSetTargetPrice(it, v), { placeholder: "e.g. 4.00 — blank to clear", hint });
+        } },
       { label: it.target_unit ? `📏 Price is per ${it.target_unit}` : "📏 Price is flat (per package)",
         onClick: () => showSheet("Price is per…", [
           { label: "Flat price (per package)", onClick: () => handlers.onSetTargetUnit(it, null) },
