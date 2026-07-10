@@ -23,6 +23,29 @@ function itemCountLabel(n) {
   return `${n} item${n === 1 ? "" : "s"}`;
 }
 
+// Store picker options: the household's usual stores first, then other common GTA stores.
+const MY_STORES = ["No Frills", "FreshCo", "Walmart", "Real Canadian Superstore", "Food Basics"];
+const OTHER_STORES = ["Costco", "T&T", "Loblaws", "Metro", "Sobeys", "Longo's", "Farm Boy",
+  "Fortinos", "Shoppers Drug Mart", "Adonis", "Btrust", "Bulk Barn", "Dollarama", "Whole Foods"];
+
+// A native <select> for the item's store (real mobile picker). Empty = no store set.
+function buildStoreSelect(item, handlers) {
+  const mine = el("optgroup", { label: "My stores" });
+  for (const s of MY_STORES) mine.append(el("option", { value: s, text: s }));
+  const other = el("optgroup", { label: "Other stores" });
+  for (const s of OTHER_STORES) other.append(el("option", { value: s, text: s }));
+  const sel = el("select",
+    { class: item.store ? "store-select set" : "store-select", "aria-label": "Store" },
+    el("option", { value: "", text: "🛒 Store" }), mine, other);
+  // Include an option for a legacy value not in the lists, so it still displays.
+  if (item.store && !MY_STORES.includes(item.store) && !OTHER_STORES.includes(item.store)) {
+    sel.append(el("option", { value: item.store, text: item.store }));
+  }
+  sel.value = item.store || "";
+  sel.addEventListener("change", () => handlers.onSetStore(item, sel.value || null));
+  return sel;
+}
+
 // ── Lists home ─────────────────────────────────────────────────────────────
 export function renderLists(mount, lists, handlers) {
   mount.textContent = "";
@@ -167,13 +190,16 @@ function buildItemRow(item, handlers) {
         },
       },
     }));
+  // Secondary meta line: store picker + note.
+  const meta = el("div", { class: "item-meta" }, buildStoreSelect(item, handlers));
   if (item.note) {
-    text.append(el("span", { class: "note", text: item.note,
+    meta.append(el("span", { class: "note", text: item.note,
       on: { click: () => editNotePrompt(item, handlers) } }));
   } else {
-    text.append(el("button", { type: "button", class: "add-note", text: "+ note",
+    meta.append(el("button", { type: "button", class: "add-note", text: "+ note",
       on: { click: () => editNotePrompt(item, handlers) } }));
   }
+  text.append(meta);
   main.append(text);
 
   // Amount — numeric gets a −/value/+ stepper; the value is tappable to switch to

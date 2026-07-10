@@ -2,7 +2,7 @@
 
 A shared, installable grocery-list PWA for two phones (vanilla JS + Supabase). Joel and Gabrielle each sign into their own account and see the same lists with live updates as items are added, checked off, or edited. Each item has a per-item 🔔 watch toggle: items marked "watch" feed into a separate grocery-watcher project, which tracks them for restocks or price drops.
 
-Each item has a name, a free-text **amount** (e.g. "500 g", "2 L", or a plain number, which gets +/- steppers), and an optional **note**. The add box suggests recently used items as you type. Deleting an item (swipe left, or the delete control) can be undone; deleting a watched item asks for confirmation first, since it also feeds the grocery-watcher project.
+Each item has a name, a free-text **amount** (e.g. "500 g", "2 L", or a plain number, which gets +/- steppers), an optional **note**, and an optional **store** (a dropdown of your usual stores plus other common ones). The add box suggests recently used items as you type. Deleting an item (swipe left, or the delete control) can be undone; deleting a watched item asks for confirmation first, since it also feeds the grocery-watcher project.
 
 ## Themes & appearance
 
@@ -43,7 +43,7 @@ This app uses **two Supabase accounts**, one each for Joel and Gabrielle, with a
 
 `config.js` is not a secret file. The URL and anon key are meant to be public in a client-side app; see "Security model" below for why that's safe here.
 
-If you already set up a project against the earlier schema, run `supabase/migrate-redesign.sql` once too (adds `amount`, `note`, and the `item_history` table).
+If you already set up a project against the earlier schema, run `supabase/migrate-redesign.sql` once (adds `amount`, `note`, and the `item_history` table), then `supabase/migrate-store.sql` (adds the `store` column).
 
 ## Installing on a phone ("Add to Home Screen")
 

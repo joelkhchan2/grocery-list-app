@@ -16,6 +16,7 @@ create table items (
   checked boolean not null default false,
   watch boolean not null default false,
   note text,
+  store text,
   sort_order int not null default 0,
   created_by uuid default auth.uid(),   -- who added it (for future "who added this" UI); null for admin/dashboard inserts
   created_at timestamptz not null default now(),
