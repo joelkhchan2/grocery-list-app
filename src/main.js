@@ -2,7 +2,7 @@ import { getClient } from "./supabase.js";
 import { currentSession, signIn, signOut, renderSignIn } from "./auth.js";
 import * as db from "./db.js";
 import { renderLists, renderListDetail, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, setMyStores } from "./ui.js";
-import { loadPrefs, savePrefs, applyTheme, resolveActive } from "./theme.js";
+import { loadPrefs, savePrefs, applyTheme, applyCustom, resolveActive } from "./theme.js";
 import { isSelfEcho, idsToClear, bySortOrder } from "./model.js";
 
 const app = document.getElementById("app");
@@ -20,6 +20,7 @@ let netListenersBound = false;      // guards against re-adding window online/of
 let prefs = loadPrefs();
 const mq = matchMedia("(prefers-color-scheme: dark)");
 applyTheme(resolveActive(prefs.theme, prefs.autoDark, mq.matches));
+applyCustom(prefs);
 mq.addEventListener("change", () => {
   if (prefs.autoDark) applyTheme(resolveActive(prefs.theme, prefs.autoDark, mq.matches));
 });
@@ -241,6 +242,22 @@ const handlers = {
     savePrefs(prefs);
     applyTheme(resolveActive(prefs.theme, prefs.autoDark, mq.matches));
     refresh();
+  },
+  onPickFont: (key) => {
+    prefs = { ...prefs, font: key };
+    savePrefs(prefs); applyCustom(prefs); refresh();
+  },
+  onSetFontScale: (scale) => {
+    prefs = { ...prefs, fontScale: scale };
+    savePrefs(prefs); applyCustom(prefs); refresh();
+  },
+  onSetCustomColor: (kind, hex) => {          // kind: ac | tx | bg; hex or null to clear
+    prefs = { ...prefs, colors: { ...prefs.colors, [kind]: hex || null } };
+    savePrefs(prefs); applyCustom(prefs); refresh();
+  },
+  onResetCustom: () => {
+    prefs = { ...prefs, font: "system", fontScale: 1, colors: {} };
+    savePrefs(prefs); applyCustom(prefs); refresh();
   },
   onSignOut: async () => { await signOut(client); boot(); },
 };

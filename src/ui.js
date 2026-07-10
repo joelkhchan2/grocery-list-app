@@ -2,7 +2,7 @@
 // All user-provided text (list/item names, notes, amounts) is set via textContent / DOM APIs only —
 // never interpolated into innerHTML.
 import { bySortOrder, isNumericAmount, stepAmount } from "./model.js";
-import { THEMES } from "./theme.js";
+import { THEMES, FONTS, FONT_SIZES } from "./theme.js";
 import { categoryOf, CATEGORY_ORDER } from "./category.js";
 import { MEMBERS } from "../config.js";
 
@@ -883,6 +883,15 @@ export function renderSuggestions(rows, onPick) {
 }
 
 // ── Appearance / settings ─────────────────────────────────────────────────────
+// Current computed value of a CSS custom property, if it's a 6-digit hex (so a
+// <input type=color> can be seeded with the active theme colour). "" otherwise.
+function cssVar(name) {
+  try {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return /^#[0-9a-f]{6}$/i.test(v) ? v : "";
+  } catch { return ""; }
+}
+
 export function renderAppearance(mount, prefs, handlers) {
   mount.textContent = "";
 
@@ -913,6 +922,59 @@ export function renderAppearance(mount, prefs, handlers) {
     grid.append(swatch);
   }
   settings.append(grid);
+
+  // Font family (curated set; each button previews its own face).
+  settings.append(el("span", { class: "settings-label", text: "Font" }));
+  const fontRow = el("div", { class: "seg-row" });
+  for (const [key, f] of Object.entries(FONTS)) {
+    const active = (prefs.font || "system") === key;
+    fontRow.append(el("button", {
+      type: "button", class: active ? "seg on" : "seg", style: { fontFamily: f.stack },
+      "aria-pressed": String(active), text: f.label,
+      on: { click: () => handlers.onPickFont(key) },
+    }));
+  }
+  settings.append(fontRow);
+
+  // Text size (a few steps; scales everything proportionally).
+  settings.append(el("span", { class: "settings-label", text: "Text size" }));
+  const sizeRow = el("div", { class: "seg-row" });
+  const curScale = prefs.fontScale || 1;
+  for (const s of FONT_SIZES) {
+    const active = Math.abs(curScale - s.scale) < 0.001;
+    sizeRow.append(el("button", {
+      type: "button", class: active ? "seg on" : "seg", "aria-pressed": String(active), text: s.label,
+      on: { click: () => handlers.onSetFontScale(s.scale) },
+    }));
+  }
+  settings.append(sizeRow);
+
+  // Custom colors — layered on top of the selected theme. Empty = use the theme's colour.
+  settings.append(el("span", { class: "settings-label", text: "Custom colors" }));
+  const colors = prefs.colors || {};
+  const colorRow = (label, kind, fallbackVar) => {
+    const val = colors[kind];
+    const swatch = el("input", {
+      type: "color", class: "color-input", value: val || cssVar(fallbackVar) || "#888888",
+      "aria-label": label,
+    });
+    swatch.addEventListener("change", () => handlers.onSetCustomColor(kind, swatch.value));
+    return el("div", { class: "color-row" },
+      el("span", { class: "grow", text: label }),
+      val ? el("button", {
+        type: "button", class: "color-clear", text: "Reset",
+        on: { click: () => handlers.onSetCustomColor(kind, null) },
+      }) : null,
+      swatch);
+  };
+  settings.append(el("div", { class: "color-edit" },
+    colorRow("Accent", "ac", "--ac"),
+    colorRow("Text", "tx", "--tx"),
+    colorRow("Background", "bg", "--bg")));
+  settings.append(el("button", {
+    type: "button", class: "bulk-btn", text: "Reset customization",
+    on: { click: () => handlers.onResetCustom() },
+  }));
 
   settings.append(el("div", { class: "toggle-row" },
     el("span", { class: "label", text: "Match system light/dark" }),

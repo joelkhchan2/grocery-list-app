@@ -650,6 +650,35 @@ body {
   cursor: pointer;
 }
 .swatch-name { font-size: var(--fs-sub); }
+
+/* Appearance: segmented rows (font / text size) + custom-colour rows. */
+.seg-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.seg {
+  flex: 1 1 auto;
+  min-width: 56px;
+  min-height: 40px;
+  padding: 6px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  color: var(--tx);
+  font: inherit;
+  cursor: pointer;
+}
+.seg.on { background: var(--ac); color: var(--card); border-color: var(--ac); font-weight: 600; }
+.color-edit { display: flex; flex-direction: column; gap: var(--space-3); margin-bottom: var(--space-4); }
+.color-row { display: flex; align-items: center; gap: var(--space-3); }
+.color-row .grow { flex: 1; }
+.color-clear { background: none; border: none; color: var(--sub); font: inherit; font-size: var(--fs-sub); cursor: pointer; }
+.color-input {
+  width: 46px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  background: none;
+  cursor: pointer;
+}
 .swatch-chips { display: flex; gap: var(--space-1); }
 .swatch-chip {
   width: 18px;

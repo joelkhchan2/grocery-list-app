@@ -13,12 +13,35 @@
   <link rel="apple-touch-icon" href="assets/icon-192.png">
   <link rel="stylesheet" href="src/style.css">
   <script>
-    // Pre-paint theme bootstrap: set data-theme before the app JS runs to avoid a theme flash.
+    // Pre-paint bootstrap: set theme + per-device customization before the app JS runs
+    // to avoid a flash. Mirrors theme.js applyCustom (kept in sync deliberately).
     try {
+      var root = document.documentElement;
       var t = localStorage.getItem("glTheme") || "terracotta";
       var auto = localStorage.getItem("glAutoDark") !== "0";
       var darkSys = matchMedia("(prefers-color-scheme: dark)").matches;
-      document.documentElement.dataset.theme = (auto && darkSys) ? "midnight" : t;
+      root.dataset.theme = (auto && darkSys) ? "midnight" : t;
+      var ac = localStorage.getItem("glColAc"); if (ac) root.style.setProperty("--ac", ac);
+      var tx = localStorage.getItem("glColTx"); if (tx) root.style.setProperty("--tx", tx);
+      var bg = localStorage.getItem("glColBg"); if (bg) root.style.setProperty("--bg", bg);
+      var fonts = {
+        system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        rounded: '"Nunito", "Segoe UI", system-ui, sans-serif',
+        serif: 'Georgia, "Times New Roman", serif',
+        mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
+      };
+      var f = localStorage.getItem("glFont");
+      if (f && fonts[f]) {
+        root.style.setProperty("--font-stack", fonts[f]);
+        if (f === "rounded") {
+          var nl = document.createElement("link");
+          nl.id = "gl-font-rounded"; nl.rel = "stylesheet";
+          nl.href = "https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap";
+          document.head.appendChild(nl);
+        }
+      }
+      var fs = parseFloat(localStorage.getItem("glFontScale"));
+      if (fs && fs !== 1) root.style.fontSize = (fs * 100) + "%";
     } catch (e) {}
   </script>
   <title>Our Grocery Lists</title>
