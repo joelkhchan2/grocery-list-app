@@ -3,6 +3,7 @@
 // never interpolated into innerHTML.
 import { bySortOrder, isNumericAmount, stepAmount } from "./model.js";
 import { THEMES } from "./theme.js";
+import { categoryOf, CATEGORY_ORDER } from "./category.js";
 
 // Tiny element helper. `text` is safe (textContent). Structural strings are author-controlled.
 // `on` is a map of event → handler; `dataset`/`style` are shallow-assigned; any other key is an attribute.
@@ -46,6 +47,30 @@ function buildStoreSelect(item, handlers) {
   return sel;
 }
 
+// Append collapsible <details> sections for pre-built groups to a container.
+function appendGroups(listEl, groups, handlers) {
+  for (const grp of groups) {
+    const body = el("div", { class: "store-group-body" });
+    for (const item of grp.items) body.append(buildItemRow(item, handlers));
+    listEl.append(el("details", { class: "store-group", open: "" },
+      el("summary", { class: "store-summary" },
+        el("span", { text: grp.label }),
+        el("span", { class: "store-count", text: String(grp.items.length) })),
+      body));
+  }
+}
+
+// Group items by category (built-in dictionary) in CATEGORY_ORDER order.
+function groupActiveByCategory(items) {
+  const byCat = new Map();
+  for (const it of items) {
+    const c = categoryOf(it.name);
+    if (!byCat.has(c)) byCat.set(c, []);
+    byCat.get(c).push(it);
+  }
+  return CATEGORY_ORDER.filter((c) => byCat.has(c)).map((c) => ({ label: c, items: byCat.get(c) }));
+}
+
 // Group items by store for the "group by store" view. Returns ordered groups:
 // the household's stores first (in MY_STORES order), then other known/custom
 // stores (alphabetical), then a "No store" group last. Item order within a
@@ -68,6 +93,35 @@ function groupActiveByStore(items) {
   return groups;
 }
 
+// Emoji palette for lists. Tap opens a bottom sheet; picking calls onPick(emoji)
+// and "Remove emoji" calls onPick(null).
+const EMOJI_CHOICES = ["🛒", "🥦", "🍎", "🥕", "🥛", "🧀", "🍞", "🥩", "🐟", "🍗",
+  "🍅", "🧅", "🥚", "🍌", "🍫", "🍪", "🥤", "☕", "🧻", "🧼", "🧴", "🐶", "🐱", "👶",
+  "🎉", "🎂", "🏠", "📦", "🧊", "🌮", "🍕", "🍺"];
+
+function showEmojiPicker(onPick) {
+  const prev = document.querySelector(".emoji-overlay");
+  if (prev) prev.remove();
+  const grid = el("div", { class: "emoji-grid" });
+  const overlay = el("div", { class: "emoji-overlay" });
+  for (const e of EMOJI_CHOICES) {
+    grid.append(el("button", {
+      type: "button", class: "emoji-choice", text: e,
+      on: { click: () => { overlay.remove(); onPick(e); } },
+    }));
+  }
+  const sheet = el("div", { class: "emoji-sheet" },
+    el("div", { class: "emoji-title", text: "Pick an emoji" }),
+    grid,
+    el("button", {
+      type: "button", class: "emoji-clear", text: "Remove emoji",
+      on: { click: () => { overlay.remove(); onPick(null); } },
+    }));
+  overlay.append(sheet);
+  overlay.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
+  document.body.append(overlay);
+}
+
 // ── Lists home ─────────────────────────────────────────────────────────────
 export function renderLists(mount, lists, handlers) {
   mount.textContent = "";
@@ -88,7 +142,16 @@ export function renderLists(mount, lists, handlers) {
         class: "row-main tappable",
         on: { click: () => handlers.onOpenList(list.id) },
       });
-      if (list.emoji) main.append(el("span", { class: "emoji", text: list.emoji }));
+      main.append(el("button", {
+        type: "button", class: list.emoji ? "emoji-btn" : "emoji-btn placeholder",
+        "aria-label": list.emoji ? "Change list emoji" : "Add list emoji", text: list.emoji || "＋",
+        on: {
+          click: (e) => {
+            e.stopPropagation();
+            showEmojiPicker((emoji) => handlers.onSetListEmoji(list.id, emoji));
+          },
+        },
+      }));
       main.append(el("div", { class: "row-text" }, el("span", { class: "name", text: list.name })));
 
       // Rename — stops propagation so it edits the name instead of opening the list.
@@ -131,7 +194,7 @@ export function renderLists(mount, lists, handlers) {
 }
 
 // ── List detail ─────────────────────────────────────────────────────────────
-export function renderListDetail(mount, list, items, handlers, groupByStore = false) {
+export function renderListDetail(mount, list, items, handlers, sortMode = "manual") {
   mount.textContent = "";
 
   mount.append(el("div", { class: "bar" },
@@ -149,32 +212,43 @@ export function renderListDetail(mount, list, items, handlers, groupByStore = fa
   if (!items.length) {
     listEl.append(el("p", { class: "muted", text: "This list is empty — add an item below" }));
   } else {
-    const sorted = bySortOrder(items);
-    const active = sorted.filter((i) => !i.checked);
-    const done = sorted.filter((i) => i.checked);
+    const active = items.filter((i) => !i.checked);
+    const done = items.filter((i) => i.checked);
 
-    if (active.length) {
-      listEl.append(el("div", { class: "group-toggle" },
-        el("span", { class: "label", text: "Group by store" }),
-        el("button", {
-          type: "button", class: groupByStore ? "toggle on" : "toggle",
-          "aria-label": "Group by store", "aria-pressed": String(!!groupByStore),
-          on: { click: () => handlers.onToggleGroupByStore() },
-        })));
-    }
+    // Controls: sort/group selector + client-side filter box.
+    const sortSel = el("select", { class: "sort-select", "aria-label": "Sort" },
+      el("option", { value: "manual", text: "Manual order" }),
+      el("option", { value: "alpha", text: "A–Z" }),
+      el("option", { value: "store", text: "By store" }),
+      el("option", { value: "category", text: "By category" }));
+    sortSel.value = sortMode;
+    sortSel.addEventListener("change", () => handlers.onSetSort(sortSel.value));
 
-    if (groupByStore && active.length) {
-      for (const grp of groupActiveByStore(active)) {
-        const body = el("div", { class: "store-group-body" });
-        for (const item of grp.items) body.append(buildItemRow(item, handlers));
-        listEl.append(el("details", { class: "store-group", open: "" },
-          el("summary", { class: "store-summary" },
-            el("span", { text: grp.label }),
-            el("span", { class: "store-count", text: String(grp.items.length) })),
-          body));
+    const filter = el("input", {
+      type: "search", class: "filter-input", placeholder: "Filter items…", "aria-label": "Filter items",
+    });
+    filter.addEventListener("input", () => {
+      const q = filter.value.trim().toLowerCase();
+      for (const row of listEl.querySelectorAll(".row")) {
+        row.classList.toggle("filtered-out", q !== "" && !(row.dataset.name || "").includes(q));
       }
+      for (const grp of listEl.querySelectorAll(".store-group")) {
+        const anyVisible = [...grp.querySelectorAll(".row")].some((r) => !r.classList.contains("filtered-out"));
+        grp.classList.toggle("filtered-out", !anyVisible);
+      }
+    });
+    listEl.append(el("div", { class: "list-controls" }, sortSel, filter));
+
+    // Active items, per sort mode.
+    if (sortMode === "store") {
+      appendGroups(listEl, groupActiveByStore(bySortOrder(active)), handlers);
+    } else if (sortMode === "category") {
+      appendGroups(listEl, groupActiveByCategory(bySortOrder(active)), handlers);
     } else {
-      for (const item of active) listEl.append(buildItemRow(item, handlers));
+      const ordered = sortMode === "alpha"
+        ? [...active].sort((a, b) => String(a.name).localeCompare(String(b.name)))
+        : bySortOrder(active);
+      for (const item of ordered) listEl.append(buildItemRow(item, handlers));
     }
 
     if (done.length) {
@@ -290,7 +364,10 @@ function buildItemRow(item, handlers) {
     },
   });
 
-  return el("div", { class: item.checked ? "row done" : "row" }, main, del);
+  return el("div", {
+    class: item.checked ? "row done" : "row",
+    dataset: { name: String(item.name || "").toLowerCase() },
+  }, main, del);
 }
 
 // Sticky bottom add-bar. When `withSuggest`, embeds a persistent #suggest dropdown container

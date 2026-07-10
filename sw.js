@@ -1,4 +1,4 @@
-const SHELL = "shell-v7";
+const SHELL = "shell-v8";
 // Precache the full local app (shell + all ES modules + config) so an offline same-origin
 // load runs the app rather than hanging on a missing module fetch. The Supabase/esm.sh
 // requests still go to the network (data must be live); if they fail, main.js shows the
@@ -6,7 +6,7 @@ const SHELL = "shell-v7";
 const ASSETS = [
   "./", "./index.html", "./manifest.webmanifest", "./config.js",
   "./src/style.css", "./src/main.js", "./src/supabase.js", "./src/db.js",
-  "./src/model.js", "./src/auth.js", "./src/ui.js", "./src/theme.js"
+  "./src/model.js", "./src/auth.js", "./src/ui.js", "./src/theme.js", "./src/category.js"
 ];
 self.addEventListener("install", (e) => e.waitUntil(caches.open(SHELL).then(c => c.addAll(ASSETS))));
 self.addEventListener("activate", (e) => e.waitUntil(

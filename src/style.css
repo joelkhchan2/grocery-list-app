@@ -894,3 +894,101 @@ body {
 .store-summary::before { content: "▸"; font-size: 0.9em; }
 details[open] > .store-summary::before { content: "▾"; }
 .store-count { margin-left: auto; }
+
+/* ── List controls (sort + filter) ───────────────────────────────────── */
+.list-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-2) var(--space-4) var(--space-1);
+}
+.sort-select {
+  flex: none;
+  font: inherit;
+  font-size: var(--fs-sub);
+  color: var(--tx);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.filter-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--fs-sub);
+  color: var(--tx);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctl);
+  padding: 8px 12px;
+}
+.filter-input::placeholder { color: var(--sub); }
+.row.filtered-out,
+.store-group.filtered-out { display: none; }
+
+/* ── List emoji button + picker sheet ────────────────────────────────── */
+.emoji-btn {
+  flex: none;
+  width: 40px;
+  min-height: 40px;
+  font-size: 1.3rem;
+  background: none;
+  border: none;
+  border-radius: var(--r-ctl);
+  cursor: pointer;
+}
+.emoji-btn.placeholder {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  font-size: 1rem;
+  color: var(--sub);
+  border: 1px dashed var(--border);
+}
+.emoji-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.35);
+}
+.emoji-sheet {
+  width: 100%;
+  max-width: 480px;
+  background: var(--card);
+  color: var(--tx);
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  padding: var(--space-4) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+  box-shadow: var(--shadow-lg);
+}
+.emoji-title { font-weight: 700; text-align: center; margin-bottom: var(--space-3); }
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: var(--space-2);
+}
+.emoji-choice {
+  min-height: 48px;
+  font-size: 1.5rem;
+  background: none;
+  border: none;
+  border-radius: var(--r-ctl);
+  cursor: pointer;
+}
+.emoji-choice:active { background: var(--bg); }
+.emoji-clear {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: var(--space-3);
+  background: none;
+  border: none;
+  color: var(--danger);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}

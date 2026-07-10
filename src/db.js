@@ -14,6 +14,9 @@ export async function createList(client, { name, emoji = null }) {
 export async function renameList(client, id, name) {
   return run(client.from("lists").update({ name }).eq("id", id).select().single());
 }
+export async function updateList(client, id, patch) {
+  return run(client.from("lists").update(patch).eq("id", id).select().single());
+}
 export async function deleteList(client, id) {
   return run(client.from("lists").delete().eq("id", id));
 }

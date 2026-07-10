@@ -22,8 +22,8 @@ mq.addEventListener("change", () => {
 });
 
 let addQueryTimer = null;           // debounce for autocomplete queries
-let groupByStore = false;           // per-device: group list-detail items by store
-try { groupByStore = localStorage.getItem("glGroupByStore") === "1"; } catch { /* private mode */ }
+let sortMode = "manual";            // per-device list sort/group: manual | alpha | store | category
+try { sortMode = localStorage.getItem("glSort") || "manual"; } catch { /* private mode */ }
 
 function setStatus(msg) {            // transient inline banner (errors / reconnecting)
   if (!statusEl) return;
@@ -61,7 +61,7 @@ async function refresh() {
     const lists = await db.fetchLists(client);
     const list = lists.find(l => l.id === state.listId);
     if (!list) { state = { view: "lists", listId: null }; return refresh(); }
-    renderListDetail(app, list, await db.fetchItems(client, state.listId), handlers, groupByStore);
+    renderListDetail(app, list, await db.fetchItems(client, state.listId), handlers, sortMode);
   }
 }
 
@@ -83,9 +83,10 @@ const handlers = {
   onEditItem: (it, name) => mutate(() => db.updateItem(client, it.id, { name }), [it.id]),
   onEditNote: (it, note) => mutate(() => db.updateItem(client, it.id, { note }), [it.id]),
   onSetStore: (it, store) => mutate(() => db.updateItem(client, it.id, { store }), [it.id]),
-  onToggleGroupByStore: () => {
-    groupByStore = !groupByStore;
-    try { localStorage.setItem("glGroupByStore", groupByStore ? "1" : "0"); } catch { /* private mode */ }
+  onSetListEmoji: (id, emoji) => mutate(() => db.updateList(client, id, { emoji }), [id]),
+  onSetSort: (mode) => {
+    sortMode = mode;
+    try { localStorage.setItem("glSort", mode); } catch { /* private mode */ }
     refresh();
   },
   onDeleteItem: (it) => {
