@@ -252,13 +252,20 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
     }
 
     if (done.length) {
-      listEl.append(el("div", { class: "done-divider" },
-        el("span", { text: `Done · ${done.length}` }),
-        el("button", {
-          type: "button", class: "clear-checked", text: "Clear checked",
-          on: { click: () => handlers.onClearChecked(items) },
-        })));
-      for (const item of done) listEl.append(buildItemRow(item, handlers));
+      // Collapsible: tap the header to show/hide checked items; tap a checked
+      // item's box to un-check it back onto the list. Open by default.
+      const body = el("div", { class: "store-group-body" });
+      for (const item of done) body.append(buildItemRow(item, handlers));
+      listEl.append(el("details", { class: "store-group done-group", open: "" },
+        el("summary", { class: "store-summary" },
+          el("span", { text: `Done · ${done.length}` }),
+          el("button", {
+            type: "button", class: "clear-checked", text: "Clear checked",
+            on: {
+              click: (e) => { e.preventDefault(); e.stopPropagation(); handlers.onClearChecked(items); },
+            },
+          })),
+        body));
     }
   }
   mount.append(listEl);

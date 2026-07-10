@@ -894,6 +894,7 @@ body {
 .store-summary::before { content: "▸"; font-size: 0.9em; }
 details[open] > .store-summary::before { content: "▾"; }
 .store-count { margin-left: auto; }
+.store-summary .clear-checked { margin-left: auto; }
 
 /* ── List controls (sort + filter) ───────────────────────────────────── */
 .list-controls {
