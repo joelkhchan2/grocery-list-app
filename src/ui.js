@@ -122,6 +122,26 @@ function showEmojiPicker(onPick) {
   document.body.append(overlay);
 }
 
+// Generic bottom-sheet menu. options = [{ label, danger?, onClick }].
+export function showSheet(title, options) {
+  const prev = document.querySelector(".emoji-overlay");
+  if (prev) prev.remove();
+  const overlay = el("div", { class: "emoji-overlay" });
+  const opts = el("div", { class: "sheet-options" });
+  for (const o of options) {
+    opts.append(el("button", {
+      type: "button", class: o.danger ? "sheet-option danger" : "sheet-option", text: o.label,
+      on: { click: () => { overlay.remove(); o.onClick(); } },
+    }));
+  }
+  overlay.append(el("div", { class: "emoji-sheet" },
+    el("div", { class: "emoji-title", text: title }),
+    opts,
+    el("button", { type: "button", class: "emoji-clear", text: "Cancel", on: { click: () => overlay.remove() } })));
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.append(overlay);
+}
+
 // Drag-to-reorder via a per-row handle. Rows are the direct children of `zone`,
 // each with data-id and a `.drag-handle` child. Dragging only starts from the
 // handle (which has touch-action:none in CSS), so it never fights list scrolling
@@ -220,17 +240,10 @@ export function renderLists(mount, lists, handlers) {
         }));
       }
 
-      // Rename — stops propagation so it edits the name instead of opening the list.
+      // List actions menu (rename / duplicate / …). Stops propagation so it doesn't open the list.
       main.append(el("button", {
-        type: "button", class: "icon-btn", "aria-label": "Rename list", text: "✏️",
-        on: {
-          click: (e) => {
-            e.stopPropagation();
-            const next = prompt("Rename list", list.name);
-            const t = next && next.trim();
-            if (t && t !== list.name) handlers.onRenameList(list.id, t);
-          },
-        },
+        type: "button", class: "icon-btn", "aria-label": "List actions", text: "⋯",
+        on: { click: (e) => { e.stopPropagation(); handlers.onListMenu(list); } },
       }));
 
       // Red delete panel (revealed by left-swipe). List deletion cascades its items.
@@ -447,6 +460,12 @@ function buildItemRow(item, handlers, opts = {}) {
     "aria-label": item.watch ? "Watching for deals" : "Watch for deals",
     "aria-pressed": String(!!item.watch), text: "🔔",
     on: { click: () => handlers.onToggleWatch(item) },
+  }));
+
+  // Overflow menu (move to another list).
+  main.append(el("button", {
+    type: "button", class: "icon-btn", "aria-label": "Item actions", text: "⋯",
+    on: { click: () => handlers.onItemMenu(item) },
   }));
 
   // Red delete panel (revealed by left-swipe, also a real focusable button).

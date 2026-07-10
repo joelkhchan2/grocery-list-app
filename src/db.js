@@ -80,3 +80,22 @@ export async function reorderLists(client, ids) {
 export async function checkAll(client, listId, checked) {
   return run(client.from("items").update({ checked }).eq("list_id", listId).select());
 }
+// Move an item to a different list.
+export async function moveItem(client, id, listId) {
+  return run(client.from("items").update({ list_id: listId }).eq("id", id).select().single());
+}
+// Duplicate a list and its items into a new "<name> (copy)" list (items reset to unchecked).
+export async function duplicateList(client, listId) {
+  const src = (await run(client.from("lists").select("*").eq("id", listId)))?.[0];
+  if (!src) return null;
+  const newList = await run(
+    client.from("lists").insert({ name: `${src.name} (copy)`, emoji: src.emoji }).select().single());
+  const items = (await run(client.from("items").select("*").eq("list_id", listId))) || [];
+  if (items.length) {
+    await run(client.from("items").insert(items.map((it) => ({
+      list_id: newList.id, name: it.name, amount: it.amount, note: it.note,
+      store: it.store, watch: it.watch, sort_order: it.sort_order, checked: false,
+    }))));
+  }
+  return newList;
+}

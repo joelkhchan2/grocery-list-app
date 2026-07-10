@@ -1,7 +1,7 @@
 import { getClient } from "./supabase.js";
 import { currentSession, signIn, signOut, renderSignIn } from "./auth.js";
 import * as db from "./db.js";
-import { renderLists, renderListDetail, renderSuggestions, renderAppearance, showUndo } from "./ui.js";
+import { renderLists, renderListDetail, renderSuggestions, renderAppearance, showUndo, showSheet } from "./ui.js";
 import { loadPrefs, savePrefs, applyTheme, resolveActive } from "./theme.js";
 import { isSelfEcho, idsToClear } from "./model.js";
 
@@ -10,6 +10,7 @@ const statusEl = document.getElementById("status");
 const client = getClient();
 const pending = new Set();          // REAL row ids of in-flight local mutations (self-echo suppression)
 let state = { view: "lists", listId: null };
+let lastLists = [];                 // most recent fetchLists result (for move-target + list menus)
 let netListenersBound = false;      // guards against re-adding window online/offline listeners on re-boot
 
 // Theme: apply saved prefs immediately (index.html already set data-theme pre-paint to avoid a flash;
@@ -64,10 +65,11 @@ async function refresh() {
     return;
   }
   if (state.view === "lists") {
-    renderLists(app, await db.fetchLists(client), handlers);
+    lastLists = await db.fetchLists(client);
+    renderLists(app, lastLists, handlers);
   } else {
-    const lists = await db.fetchLists(client);
-    const list = lists.find(l => l.id === state.listId);
+    lastLists = await db.fetchLists(client);
+    const list = lastLists.find(l => l.id === state.listId);
     if (!list) { state = { view: "lists", listId: null }; return refresh(); }
     renderListDetail(app, list, await db.fetchItems(client, state.listId), handlers, sortMode);
   }
@@ -107,6 +109,26 @@ const handlers = {
   onUncheckAll: () => mutate(() => db.checkAll(client, state.listId, false)),
   onReorder: (ids) => mutate(() => db.reorderItems(client, ids), ids),
   onReorderLists: (ids) => mutate(() => db.reorderLists(client, ids), ids),
+  onMoveItem: (it, listId) => mutate(() => db.moveItem(client, it.id, listId), [it.id]),
+  onDuplicateList: (id) => mutate(() => db.duplicateList(client, id)),
+  onItemMenu: (it) => {
+    const targets = lastLists.filter((l) => l.id !== state.listId);
+    if (!targets.length) { setStatus("No other list to move to."); return; }
+    showSheet(`Move "${it.name}" to…`, targets.map((l) => ({
+      label: (l.emoji ? l.emoji + " " : "") + l.name,
+      onClick: () => handlers.onMoveItem(it, l.id),
+    })));
+  },
+  onListMenu: (list) => {
+    showSheet(list.name, [
+      { label: "Rename list", onClick: () => {
+          const next = prompt("Rename list", list.name);
+          const t = next && next.trim();
+          if (t && t !== list.name) handlers.onRenameList(list.id, t);
+        } },
+      { label: "Duplicate list", onClick: () => handlers.onDuplicateList(list.id) },
+    ]);
+  },
   onToggleHaptics: (bool) => {
     haptics = bool;
     try { localStorage.setItem("glHaptics", bool ? "1" : "0"); } catch { /* private mode */ }

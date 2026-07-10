@@ -969,6 +969,23 @@ details[open] > .store-summary::before { content: "▾"; }
   box-shadow: var(--shadow-lg);
 }
 
+/* ── Action sheet menu (reuses .emoji-overlay / .emoji-sheet) ─────────── */
+.sheet-options { display: flex; flex-direction: column; }
+.sheet-option {
+  min-height: 52px;
+  text-align: left;
+  padding: 0 var(--space-2);
+  background: none;
+  border: none;
+  color: var(--tx);
+  font: inherit;
+  font-size: var(--fs-ctl);
+  cursor: pointer;
+  border-radius: var(--r-ctl);
+}
+.sheet-option.danger { color: var(--danger); }
+.sheet-option:active { background: var(--bg); }
+
 /* ── List emoji button + picker sheet ────────────────────────────────── */
 .emoji-btn {
   flex: none;
