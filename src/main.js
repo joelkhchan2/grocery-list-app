@@ -189,6 +189,14 @@ const handlers = {
         onClick: () => showPrompt("Alert me at or under ($)",
           it.target_price != null ? String(it.target_price) : "",
           (v) => handlers.onSetTargetPrice(it, v), { placeholder: "e.g. 4.00 — blank to clear" }) },
+      { label: it.target_unit ? `📏 Price is per ${it.target_unit}` : "📏 Price is flat (per package)",
+        onClick: () => showSheet("Price is per…", [
+          { label: "Flat price (per package)", onClick: () => handlers.onSetTargetUnit(it, null) },
+          { label: "per lb", onClick: () => handlers.onSetTargetUnit(it, "lb") },
+          { label: "per kg", onClick: () => handlers.onSetTargetUnit(it, "kg") },
+          { label: "per 100g", onClick: () => handlers.onSetTargetUnit(it, "100g") },
+          { label: "each", onClick: () => handlers.onSetTargetUnit(it, "ea") },
+        ]) },
       { label: it.match_keywords ? `🔤 Match words: ${it.match_keywords}` : "🔤 Match words (advanced)",
         onClick: () => showPrompt("Match words (comma-separated; blank = use the item name)",
           it.match_keywords || "",
@@ -200,6 +208,7 @@ const handlers = {
     ]);
   },
   onSetWatchStores: (it, arr) => mutate(() => db.updateItem(client, it.id, { watch_stores: (arr && arr.length) ? arr.join(", ") : null }), [it.id]),
+  onSetTargetUnit: (it, unit) => mutate(() => db.updateItem(client, it.id, { target_unit: unit || null }), [it.id]),
   onSetMatchKeywords: (it, v) => mutate(() => db.updateItem(client, it.id, { match_keywords: (v || "").trim() || null }), [it.id]),
   onSetExcludeKeywords: (it, v) => mutate(() => db.updateItem(client, it.id, { negative_keywords: (v || "").trim() || null }), [it.id]),
   onListMenu: (list) => {

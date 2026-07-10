@@ -822,9 +822,10 @@ function buildWatchRow(item, handlers) {
   wNameLine.append(wName);
   const text = el("div", { class: "row-text" }, wNameLine);
 
+  const unitSuffix = item.target_unit ? `/${item.target_unit}` : "";
   const targetChip = el("button", {
     type: "button", class: item.target_price != null ? "target-chip set" : "target-chip",
-    text: item.target_price != null ? `🎯 ≤ $${Number(item.target_price).toFixed(2)}` : "🎯 Set price",
+    text: item.target_price != null ? `🎯 ≤ $${Number(item.target_price).toFixed(2)}${unitSuffix}` : "🎯 Set price",
     "aria-label": "Set deal price",
     on: {
       click: () => showPrompt("Alert me at or under ($)",
