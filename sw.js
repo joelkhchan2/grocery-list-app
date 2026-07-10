@@ -1,4 +1,4 @@
-const SHELL = "shell-v18";
+const SHELL = "shell-v19";
 // App-shell cache for offline/install. Strategy is NETWORK-FIRST for same-origin
 // files: always try the latest over the network and refresh the cache, falling back
 // to cache only when offline. This (plus skipWaiting + clients.claim) means a new

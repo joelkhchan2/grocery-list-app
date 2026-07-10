@@ -399,7 +399,7 @@ export function renderLists(mount, lists, templates, handlers) {
 }
 
 // ── List detail ─────────────────────────────────────────────────────────────
-export function renderListDetail(mount, list, items, handlers, sortMode = "manual", usuals = []) {
+export function renderListDetail(mount, list, items, handlers, sortMode = "manual", usuals = [], storeFilter = null) {
   mount.textContent = "";
 
   mount.append(el("div", { class: "bar" },
@@ -417,8 +417,12 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
   if (!items.length) {
     listEl.append(el("p", { class: "muted", text: "This list is empty — add an item below" }));
   } else {
-    const active = items.filter((i) => !i.checked);
-    const done = items.filter((i) => i.checked);
+    // Store filter (null = all stores; "" = items with no store; else a store name).
+    const inStore = (i) => storeFilter == null || (storeFilter === "" ? !i.store : i.store === storeFilter);
+    const active = items.filter((i) => !i.checked && inStore(i));
+    const done = items.filter((i) => i.checked && inStore(i));
+    const storesPresent = [...new Set(items.map((i) => i.store).filter(Boolean))].sort();
+    const hasNoStore = items.some((i) => !i.store);
 
     // Controls: sort/group selector + client-side filter box.
     const sortSel = el("select", { class: "sort-select", "aria-label": "Sort" },
@@ -443,6 +447,19 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
       }
     });
     listEl.append(el("div", { class: "list-controls" }, sortSel, filter));
+
+    // Store filter chips — only when items span 2+ store buckets. Filters to one store.
+    if (storesPresent.length + (hasNoStore ? 1 : 0) >= 2) {
+      const chips = el("div", { class: "store-filter" });
+      const chip = (label, val) => el("button", {
+        type: "button", class: storeFilter === val ? "sf-chip on" : "sf-chip", text: label,
+        on: { click: () => handlers.onSetStoreFilter(val) },
+      });
+      chips.append(chip("All", null));
+      for (const s of storesPresent) chips.append(chip(s, s));
+      if (hasNoStore) chips.append(chip("No store", ""));
+      listEl.append(chips);
+    }
 
     // Bulk actions: check all active items / uncheck all done items.
     const bulk = el("div", { class: "bulk-actions" });

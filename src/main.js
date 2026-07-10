@@ -12,6 +12,7 @@ const pending = new Set();          // REAL row ids of in-flight local mutations
 let state = { view: "lists", listId: null };
 let lastLists = [];                 // most recent fetchLists result (for move-target + list menus)
 let lastItems = [];                 // most recent list-detail items (for the item ⋯ menu: reorder)
+let storeFilter = null;             // transient: filter list detail to one store (null = all)
 let netListenersBound = false;      // guards against re-adding window online/offline listeners on re-boot
 
 // Theme: apply saved prefs immediately (index.html already set data-theme pre-paint to avoid a flash;
@@ -76,12 +77,13 @@ async function refresh() {
     const items = await db.fetchItems(client, state.listId);
     lastItems = items;
     const usuals = await db.topItems(client).catch(() => []);
-    renderListDetail(app, list, items, handlers, sortMode, usuals);
+    renderListDetail(app, list, items, handlers, sortMode, usuals, storeFilter);
   }
 }
 
 const handlers = {
-  onOpenList: (id) => { state = { view: "detail", listId: id }; refresh(); },
+  onOpenList: (id) => { storeFilter = null; state = { view: "detail", listId: id }; refresh(); },
+  onSetStoreFilter: (v) => { storeFilter = v; refresh(); },
   onOpenSettings: () => { state = { view: "settings" }; refresh(); },
   onBack: () => { state = { view: "lists", listId: null }; refresh(); },
   onNewList: (name) => mutate(() => db.createList(client, { name })),

@@ -923,6 +923,32 @@ body {
 }
 .store-opt.on { color: var(--ac); font-weight: 700; }
 .store-opt:active { background: var(--bg); }
+
+/* Store filter chips (filter list detail to one store) */
+.store-filter {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin: 0 var(--space-4) var(--space-1);
+  padding-bottom: 2px;
+}
+.store-filter::-webkit-scrollbar { display: none; }
+.sf-chip {
+  flex: none;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  color: var(--sub);
+  font: inherit;
+  font-size: var(--fs-sub);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sf-chip.on { background: var(--ac); border-color: var(--ac); color: var(--ontop); font-weight: 700; }
 .icon { display: block; }
 .watch-flag {
   flex: none;
