@@ -276,6 +276,7 @@ body {
 
 .row-main {
   flex: 0 0 100%;
+  min-width: 0;   /* cap at the row width; without this, min-width:auto lets wide content push controls off-screen */
   scroll-snap-align: start;
   display: flex;
   align-items: center;
@@ -848,12 +849,36 @@ body {
 }
 
 /* ── Item meta line (store picker + note) ────────────────────────────── */
-.item-meta {
+/* Line 2 of a row: store chip + watch/target flags, full width so the store is legible. */
+.meta-line {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  margin-top: 4px;
+}
+/* Line 3 of a row: note (left, truncates) + amount control (right). */
+.row-line2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  margin-top: 4px;
+}
+.row-line2 > .note,
+.row-line2 > .add-note { flex: 0 1 auto; min-width: 0; }
+.row-line2 > .stepper,
+.row-line2 > .amount { flex: none; }
+/* Primary meta cluster: who badge · watch/target flags · store chip, kept on one row
+   so the badge never orphans; the store chip shrinks (ellipsis) rather than wrapping. */
+.meta-primary {
+  display: inline-flex;
   align-items: center;
   gap: var(--space-2) var(--space-3);
-  margin-top: 3px;
+  min-width: 0;
+  overflow: hidden;
 }
 .item-meta .add-note { align-self: auto; margin-top: 0; }
 .store-select {
@@ -870,7 +895,7 @@ body {
 
 /* Store chip (opens the styled store picker) */
 .store-chip {
-  flex: none;
+  flex: 0 1 auto;
   max-width: 45vw;
   min-height: 32px;
   padding: 3px 10px;

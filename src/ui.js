@@ -582,7 +582,8 @@ function buildItemRow(item, handlers, opts = {}) {
     on: { click: () => handlers.onToggleCheck(item) },
   }));
 
-  // Name + secondary meta line (who · watch flag · store · note).
+  // Name gets its own line so it stays readable; the amount control + meta chips sit on
+  // line 2, and the note (if any) on line 3. The ⋯ menu is the only right-column control.
   const text = el("div", { class: "row-text" },
     el("span", {
       class: "name", text: item.name,
@@ -593,47 +594,52 @@ function buildItemRow(item, handlers, opts = {}) {
         }),
       },
     }));
-  const meta = el("div", { class: "item-meta" });
-  const who = item.created_by && MEMBERS[item.created_by];
-  if (who) {
-    meta.append(el("span", {
-      class: "who", "aria-label": `Added by ${who.initial}`, title: `Added by ${who.initial}`,
-      text: who.initial, style: { background: who.color },
-    }));
-  }
-  if (item.watch) meta.append(el("span", { class: "watch-flag" }, icon("bell", 14), document.createTextNode(" watch")));
-  if (item.target_price != null) {
-    meta.append(el("span", { class: "target-flag",
-      text: `🎯 ≤ $${Number(item.target_price).toFixed(2)}`,
-      title: "Deal-price alert target" }));
-  }
-  meta.append(buildStoreChip(item, handlers));
-  if (item.note) {
-    meta.append(el("span", { class: "note", text: item.note,
-      on: { click: (e) => inlineEdit(e.currentTarget, item.note, (v) => handlers.onEditNote(item, v.trim() || null)) } }));
-  } else {
-    meta.append(el("button", { type: "button", class: "add-note", text: "+ note",
-      on: { click: (e) => inlineEdit(e.currentTarget, "", (v) => { const t = v.trim(); if (t) handlers.onEditNote(item, t); }, { placeholder: "note" }) } }));
-  }
-  text.append(meta);
-  main.append(text);
 
-  // Amount — numeric gets a −/value/+ stepper (value tappable to switch to free text);
-  // a non-numeric amount is tap-to-edit text.
+  // Amount control — numeric gets a −/value/+ stepper (value tappable for free text);
+  // a non-numeric amount is tap-to-edit text. Lives on line 2, right-aligned.
+  let amountCtl;
   if (isNumericAmount(item.amount)) {
-    main.append(el("div", { class: "stepper" },
+    amountCtl = el("div", { class: "stepper" },
       el("button", { type: "button", class: "step", "aria-label": "Fewer", text: "−",
         on: { click: () => handlers.onAmount(item, stepAmount(item.amount, -1)) } }),
       el("span", { class: "amount editable", text: String(item.amount).trim(), "aria-label": "Edit amount",
         on: { click: (e) => inlineEdit(e.currentTarget, item.amount, (v) => { const t = v.trim(); if (t && t !== String(item.amount).trim()) handlers.onEditAmount(item, t); }, { placeholder: "e.g. 500 g" }) } }),
       el("button", { type: "button", class: "step", "aria-label": "More", text: "+",
-        on: { click: () => handlers.onAmount(item, stepAmount(item.amount, +1)) } })));
+        on: { click: () => handlers.onAmount(item, stepAmount(item.amount, +1)) } }));
   } else {
-    main.append(el("span", { class: "amount editable", text: item.amount || "", "aria-label": "Edit amount",
-      on: { click: (e) => inlineEdit(e.currentTarget, item.amount, (v) => { const t = v.trim(); if (t && t !== String(item.amount || "").trim()) handlers.onEditAmount(item, t); }, { placeholder: "e.g. 500 g" }) } }));
+    amountCtl = el("span", { class: "amount editable", text: item.amount || "", "aria-label": "Edit amount",
+      on: { click: (e) => inlineEdit(e.currentTarget, item.amount, (v) => { const t = v.trim(); if (t && t !== String(item.amount || "").trim()) handlers.onEditAmount(item, t); }, { placeholder: "e.g. 500 g" }) } });
   }
 
-  // Overflow menu (watch toggle · move to list · move up/down). Keeps the row uncluttered.
+  // Line 2: who · flags · store chip kept together (badge never orphans) on the left,
+  // amount on the right.
+  const primary = el("div", { class: "meta-primary" });
+  const who = item.created_by && MEMBERS[item.created_by];
+  if (who) {
+    primary.append(el("span", {
+      class: "who", "aria-label": `Added by ${who.initial}`, title: `Added by ${who.initial}`,
+      text: who.initial, style: { background: who.color },
+    }));
+  }
+  if (item.watch) primary.append(el("span", { class: "watch-flag" }, icon("bell", 14), document.createTextNode(" watch")));
+  if (item.target_price != null) {
+    primary.append(el("span", { class: "target-flag",
+      text: `🎯 ≤ $${Number(item.target_price).toFixed(2)}`,
+      title: "Deal-price alert target" }));
+  }
+  primary.append(buildStoreChip(item, handlers));
+  text.append(el("div", { class: "meta-line" }, primary));   // line 2: store + flags, full width
+
+  // Line 3: note (left, truncates if long) + amount control (right).
+  const noteEl = item.note
+    ? el("span", { class: "note", text: item.note,
+        on: { click: (e) => inlineEdit(e.currentTarget, item.note, (v) => handlers.onEditNote(item, v.trim() || null)) } })
+    : el("button", { type: "button", class: "add-note", text: "+ note",
+        on: { click: (e) => inlineEdit(e.currentTarget, "", (v) => { const t = v.trim(); if (t) handlers.onEditNote(item, t); }, { placeholder: "note" }) } });
+  text.append(el("div", { class: "row-line2" }, noteEl, amountCtl));
+  main.append(text);
+
+  // Overflow menu (watch toggle · target price · move to list · reorder). Keeps the row uncluttered.
   main.append(el("button", {
     type: "button", class: "icon-btn", "aria-label": "Item actions",
     on: { click: () => handlers.onItemMenu(item) },
