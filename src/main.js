@@ -3,7 +3,7 @@ import { currentSession, signIn, signOut, renderSignIn } from "./auth.js";
 import * as db from "./db.js";
 import { renderLists, renderListDetail, renderSuggestions, renderAppearance, showUndo, showSheet } from "./ui.js";
 import { loadPrefs, savePrefs, applyTheme, resolveActive } from "./theme.js";
-import { isSelfEcho, idsToClear } from "./model.js";
+import { isSelfEcho, idsToClear, bySortOrder } from "./model.js";
 
 const app = document.getElementById("app");
 const statusEl = document.getElementById("status");
@@ -11,6 +11,7 @@ const client = getClient();
 const pending = new Set();          // REAL row ids of in-flight local mutations (self-echo suppression)
 let state = { view: "lists", listId: null };
 let lastLists = [];                 // most recent fetchLists result (for move-target + list menus)
+let lastItems = [];                 // most recent list-detail items (for the item ⋯ menu: reorder)
 let netListenersBound = false;      // guards against re-adding window online/offline listeners on re-boot
 
 // Theme: apply saved prefs immediately (index.html already set data-theme pre-paint to avoid a flash;
@@ -72,6 +73,7 @@ async function refresh() {
     const list = lastLists.find(l => l.id === state.listId);
     if (!list) { state = { view: "lists", listId: null }; return refresh(); }
     const items = await db.fetchItems(client, state.listId);
+    lastItems = items;
     const usuals = await db.topItems(client).catch(() => []);
     renderListDetail(app, list, items, handlers, sortMode, usuals);
   }
@@ -116,12 +118,32 @@ const handlers = {
   onSaveTemplate: (id) => mutate(() => db.saveAsTemplate(client, id)),
   onUseTemplate: (id) => mutate(() => db.useTemplate(client, id)),
   onItemMenu: (it) => {
+    const opts = [{
+      label: it.watch ? "Stop watching for deals" : "🔔 Watch for deals",
+      onClick: () => handlers.onToggleWatch(it),
+    }];
     const targets = lastLists.filter((l) => l.id !== state.listId && !l.is_template);
-    if (!targets.length) { setStatus("No other list to move to."); return; }
-    showSheet(`Move "${it.name}" to…`, targets.map((l) => ({
-      label: (l.emoji ? l.emoji + " " : "") + l.name,
-      onClick: () => handlers.onMoveItem(it, l.id),
-    })));
+    if (targets.length) {
+      opts.push({
+        label: "Move to another list…",
+        onClick: () => showSheet(`Move "${it.name}" to…`, targets.map((l) => ({
+          label: (l.emoji ? l.emoji + " " : "") + l.name,
+          onClick: () => handlers.onMoveItem(it, l.id),
+        }))),
+      });
+    }
+    if (sortMode === "manual") {
+      const active = bySortOrder(lastItems.filter((i) => !i.checked));
+      const idx = active.findIndex((i) => i.id === it.id);
+      const ids = active.map((i) => i.id);
+      if (idx > 0) opts.push({ label: "Move up", onClick: () => {
+        const a = ids.slice(); [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; handlers.onReorder(a);
+      } });
+      if (idx >= 0 && idx < active.length - 1) opts.push({ label: "Move down", onClick: () => {
+        const a = ids.slice(); [a[idx], a[idx + 1]] = [a[idx + 1], a[idx]]; handlers.onReorder(a);
+      } });
+    }
+    showSheet(it.name, opts);
   },
   onListMenu: (list) => {
     showSheet(list.name, [

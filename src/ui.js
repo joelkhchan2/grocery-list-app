@@ -217,8 +217,8 @@ export function renderLists(mount, lists, templates, handlers) {
         class: "row-main tappable",
         on: { click: () => handlers.onOpenList(list.id) },
       });
-      main.append(el("button", {
-        type: "button", class: "drag-handle", "aria-label": "Reorder list", text: "⠿",
+      main.append(el("span", {
+        class: "drag-handle", "aria-hidden": "true", text: "⠿",
         on: { click: (e) => e.stopPropagation() },
       }));
       main.append(el("button", {
@@ -429,22 +429,42 @@ function editNotePrompt(item, handlers) {
 
 // One swipe-to-delete row: .row → .row-main (100% wide) + .row-delete (revealed on left-swipe).
 function buildItemRow(item, handlers, opts = {}) {
-  const main = el("div", { class: "row-main" });
+  const del = el("button", {
+    type: "button", class: "row-delete", text: "Delete",
+    on: {
+      click: () => {
+        if (item.watch && !confirm("This item is on your deal-watch list — remove it anyway?")) return;
+        handlers.onDeleteItem(item);
+      },
+    },
+  });
 
-  if (opts.drag) {
-    main.append(el("button", {
-      type: "button", class: "drag-handle", "aria-label": "Reorder item", text: "⠿",
-    }));
+  // Done row: minimal — just checkbox + struck name (+ swipe delete). Tap the box to un-check.
+  if (item.checked) {
+    const doneMain = el("div", { class: "row-main" },
+      el("button", {
+        type: "button", class: "box on", "aria-label": "Uncheck", "aria-pressed": "true",
+        on: { click: () => handlers.onToggleCheck(item) },
+      }),
+      el("div", { class: "row-text" }, el("span", { class: "name", text: item.name })));
+    return el("div", {
+      class: "row done", dataset: { name: String(item.name || "").toLowerCase(), id: item.id },
+    }, doneMain, del);
   }
 
-  // Checkbox — checked state is `box on` with NO glyph; the ✓ is drawn solely by CSS `.box.on::after`.
+  const main = el("div", { class: "row-main" });
+
+  // Decorative drag handle (Manual sort). aria-hidden — the accessible reorder path
+  // is Move up / Move down in the ⋯ menu.
+  if (opts.drag) main.append(el("span", { class: "drag-handle", "aria-hidden": "true", text: "⠿" }));
+
+  // Checkbox — checked ✓ is drawn solely by CSS `.box.on::after`.
   main.append(el("button", {
-    type: "button", class: item.checked ? "box on" : "box",
-    "aria-label": item.checked ? "Uncheck" : "Check off", "aria-pressed": String(!!item.checked),
+    type: "button", class: "box", "aria-label": "Check off", "aria-pressed": "false",
     on: { click: () => handlers.onToggleCheck(item) },
   }));
 
-  // Name + note stack. Tap name → rename; tap note → edit/clear; "+ note" → add.
+  // Name + secondary meta line (who · watch flag · store · note).
   const text = el("div", { class: "row-text" },
     el("span", {
       class: "name", text: item.name,
@@ -456,7 +476,6 @@ function buildItemRow(item, handlers, opts = {}) {
         },
       },
     }));
-  // Secondary meta line: who-added initial + store picker + note.
   const meta = el("div", { class: "item-meta" });
   const who = item.created_by && MEMBERS[item.created_by];
   if (who) {
@@ -465,6 +484,7 @@ function buildItemRow(item, handlers, opts = {}) {
       text: who.initial, style: { background: who.color },
     }));
   }
+  if (item.watch) meta.append(el("span", { class: "watch-flag", text: "🔔 watch" }));
   meta.append(buildStoreSelect(item, handlers));
   if (item.note) {
     meta.append(el("span", { class: "note", text: item.note,
@@ -476,57 +496,29 @@ function buildItemRow(item, handlers, opts = {}) {
   text.append(meta);
   main.append(text);
 
-  // Amount — numeric gets a −/value/+ stepper; the value is tappable to switch to
-  // free text (e.g. "500 g"). A non-numeric amount is tap-to-edit text.
+  // Amount — numeric gets a −/value/+ stepper (value tappable to switch to free text);
+  // a non-numeric amount is tap-to-edit text.
   if (isNumericAmount(item.amount)) {
     main.append(el("div", { class: "stepper" },
-      el("button", {
-        type: "button", class: "step", "aria-label": "Fewer", text: "−",
-        on: { click: () => handlers.onAmount(item, stepAmount(item.amount, -1)) },
-      }),
-      el("span", {
-        class: "amount editable", text: String(item.amount).trim(), "aria-label": "Edit amount",
-        on: { click: () => editAmountPrompt(item, handlers) },
-      }),
-      el("button", {
-        type: "button", class: "step", "aria-label": "More", text: "+",
-        on: { click: () => handlers.onAmount(item, stepAmount(item.amount, +1)) },
-      })));
+      el("button", { type: "button", class: "step", "aria-label": "Fewer", text: "−",
+        on: { click: () => handlers.onAmount(item, stepAmount(item.amount, -1)) } }),
+      el("span", { class: "amount editable", text: String(item.amount).trim(), "aria-label": "Edit amount",
+        on: { click: () => editAmountPrompt(item, handlers) } }),
+      el("button", { type: "button", class: "step", "aria-label": "More", text: "+",
+        on: { click: () => handlers.onAmount(item, stepAmount(item.amount, +1)) } })));
   } else {
-    main.append(el("span", {
-      class: "amount editable", text: item.amount || "", "aria-label": "Edit amount",
-      on: { click: () => editAmountPrompt(item, handlers) },
-    }));
+    main.append(el("span", { class: "amount editable", text: item.amount || "", "aria-label": "Edit amount",
+      on: { click: () => editAmountPrompt(item, handlers) } }));
   }
 
-  // Watch bell.
-  main.append(el("button", {
-    type: "button", class: item.watch ? "watch-toggle on" : "watch-toggle",
-    "aria-label": item.watch ? "Watching for deals" : "Watch for deals",
-    "aria-pressed": String(!!item.watch), text: "🔔",
-    on: { click: () => handlers.onToggleWatch(item) },
-  }));
-
-  // Overflow menu (move to another list).
+  // Overflow menu (watch toggle · move to list · move up/down). Keeps the row uncluttered.
   main.append(el("button", {
     type: "button", class: "icon-btn", "aria-label": "Item actions", text: "⋯",
     on: { click: () => handlers.onItemMenu(item) },
   }));
 
-  // Red delete panel (revealed by left-swipe, also a real focusable button).
-  const del = el("button", {
-    type: "button", class: "row-delete", text: "Delete",
-    on: {
-      click: () => {
-        if (item.watch && !confirm("This item is on your deal-watch list — remove it anyway?")) return;
-        handlers.onDeleteItem(item);
-      },
-    },
-  });
-
   return el("div", {
-    class: item.checked ? "row done" : "row",
-    dataset: { name: String(item.name || "").toLowerCase(), id: item.id },
+    class: "row", dataset: { name: String(item.name || "").toLowerCase(), id: item.id },
   }, main, del);
 }
 
