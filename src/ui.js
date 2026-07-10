@@ -4,6 +4,7 @@
 import { bySortOrder, isNumericAmount, stepAmount } from "./model.js";
 import { THEMES } from "./theme.js";
 import { categoryOf, CATEGORY_ORDER } from "./category.js";
+import { MEMBERS } from "../config.js";
 
 // Tiny element helper. `text` is safe (textContent). Structural strings are author-controlled.
 // `on` is a map of event → handler; `dataset`/`style` are shallow-assigned; any other key is an attribute.
@@ -293,7 +294,7 @@ export function renderLists(mount, lists, templates, handlers) {
 }
 
 // ── List detail ─────────────────────────────────────────────────────────────
-export function renderListDetail(mount, list, items, handlers, sortMode = "manual") {
+export function renderListDetail(mount, list, items, handlers, sortMode = "manual", usuals = []) {
   mount.textContent = "";
 
   mount.append(el("div", { class: "bar" },
@@ -386,6 +387,20 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
         body));
     }
   }
+  // "Your usuals" — quick-add chips from history, excluding items already on this list.
+  const present = new Set(items.map((i) => String(i.name).toLowerCase()));
+  const chips = (usuals || []).filter((u) => !present.has(String(u.name).toLowerCase())).slice(0, 10);
+  if (chips.length) {
+    const row = el("div", { class: "usuals" });
+    for (const u of chips) {
+      row.append(el("button", {
+        type: "button", class: "usual-chip", text: `＋ ${u.name}`,
+        on: { click: () => handlers.onPickSuggestion(u) },
+      }));
+    }
+    listEl.append(el("div", { class: "usuals-wrap" },
+      el("div", { class: "usuals-label", text: "Your usuals" }), row));
+  }
   mount.append(listEl);
 
   mount.append(makeAddBar("Add item…", "＋", {
@@ -441,8 +456,16 @@ function buildItemRow(item, handlers, opts = {}) {
         },
       },
     }));
-  // Secondary meta line: store picker + note.
-  const meta = el("div", { class: "item-meta" }, buildStoreSelect(item, handlers));
+  // Secondary meta line: who-added initial + store picker + note.
+  const meta = el("div", { class: "item-meta" });
+  const who = item.created_by && MEMBERS[item.created_by];
+  if (who) {
+    meta.append(el("span", {
+      class: "who", "aria-label": `Added by ${who.initial}`, title: `Added by ${who.initial}`,
+      text: who.initial, style: { background: who.color },
+    }));
+  }
+  meta.append(buildStoreSelect(item, handlers));
   if (item.note) {
     meta.append(el("span", { class: "note", text: item.note,
       on: { click: () => editNotePrompt(item, handlers) } }));

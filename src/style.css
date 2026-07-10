@@ -986,6 +986,54 @@ details[open] > .store-summary::before { content: "▾"; }
 .sheet-option.danger { color: var(--danger); }
 .sheet-option:active { background: var(--bg); }
 
+/* ── Who-added initial ───────────────────────────────────────────────── */
+.who {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── "Your usuals" quick-add chips ───────────────────────────────────── */
+.usuals-wrap { margin: var(--space-3) var(--space-4) var(--space-2); }
+.usuals-label {
+  color: var(--sub);
+  font-size: var(--fs-sub);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+}
+.usuals {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.usuals::-webkit-scrollbar { display: none; }
+.usual-chip {
+  flex: none;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  color: var(--tx);
+  font: inherit;
+  font-size: var(--fs-sub);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 /* ── List emoji button + picker sheet ────────────────────────────────── */
 .emoji-btn {
   flex: none;

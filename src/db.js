@@ -55,6 +55,11 @@ export async function recentItems(client, prefix, limit = 6) {
   return run(client.from("item_history").select("*")
     .ilike("name", prefix.trim() + "%").order("last_used", { ascending: false }).limit(limit));
 }
+// "Your usuals" — most-recently-used items regardless of prefix (for quick-add chips).
+export async function topItems(client, limit = 12) {
+  return (await run(client.from("item_history").select("*")
+    .order("last_used", { ascending: false }).limit(limit))) || [];
+}
 export async function updateItem(client, id, patch) {
   return run(client.from("items").update(patch).eq("id", id).select().single());
 }

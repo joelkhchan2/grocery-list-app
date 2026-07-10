@@ -71,7 +71,9 @@ async function refresh() {
     lastLists = await db.fetchLists(client);
     const list = lastLists.find(l => l.id === state.listId);
     if (!list) { state = { view: "lists", listId: null }; return refresh(); }
-    renderListDetail(app, list, await db.fetchItems(client, state.listId), handlers, sortMode);
+    const items = await db.fetchItems(client, state.listId);
+    const usuals = await db.topItems(client).catch(() => []);
+    renderListDetail(app, list, items, handlers, sortMode, usuals);
   }
 }
 
