@@ -182,8 +182,18 @@ const handlers = {
         onClick: () => showPrompt("Alert me at or under ($)",
           it.target_price != null ? String(it.target_price) : "",
           (v) => handlers.onSetTargetPrice(it, v), { placeholder: "e.g. 4.00 — blank to clear" }) },
+      { label: it.match_keywords ? `🔤 Match words: ${it.match_keywords}` : "🔤 Match words (advanced)",
+        onClick: () => showPrompt("Match words (comma-separated; blank = use the item name)",
+          it.match_keywords || "",
+          (v) => handlers.onSetMatchKeywords(it, v), { placeholder: "e.g. dempster bread, dempsters bread" }) },
+      { label: it.negative_keywords ? `🚫 Exclude words: ${it.negative_keywords}` : "🚫 Exclude words (advanced)",
+        onClick: () => showPrompt("Exclude words (comma-separated; a deal is skipped if it contains one)",
+          it.negative_keywords || "",
+          (v) => handlers.onSetExcludeKeywords(it, v), { placeholder: "e.g. hamburger, hot dog, bagel" }) },
     ]);
   },
+  onSetMatchKeywords: (it, v) => mutate(() => db.updateItem(client, it.id, { match_keywords: (v || "").trim() || null }), [it.id]),
+  onSetExcludeKeywords: (it, v) => mutate(() => db.updateItem(client, it.id, { negative_keywords: (v || "").trim() || null }), [it.id]),
   onListMenu: (list) => {
     showSheet(list.name, [
       { label: "Rename list", onClick: () => showPrompt("Rename list", list.name, (v) => {
