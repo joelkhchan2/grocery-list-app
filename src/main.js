@@ -1,7 +1,7 @@
 import { getClient } from "./supabase.js";
 import { currentSession, signIn, signOut, renderSignIn } from "./auth.js";
 import * as db from "./db.js";
-import { renderLists, renderListDetail, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, showEmojiPicker, setMyStores } from "./ui.js";
+import { renderLists, renderListDetail, renderDeals, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, showEmojiPicker, setMyStores } from "./ui.js";
 import { loadPrefs, savePrefs, applyTheme, applyCustom, resolveActive } from "./theme.js";
 import { isSelfEcho, idsToClear, bySortOrder } from "./model.js";
 import { emojiOf } from "./category.js";
@@ -69,9 +69,16 @@ async function refresh() {
     renderAppearance(app, { ...prefs, haptics }, handlers);   // no data fetch needed
     return;
   }
+  if (state.view === "deals") {
+    const deals = await db.fetchDeals(client).catch(() => []);
+    renderDeals(app, deals, handlers);
+    return;
+  }
   if (state.view === "lists") {
     lastLists = await db.fetchLists(client);
-    renderLists(app, lastLists.filter(l => !l.is_template), lastLists.filter(l => l.is_template), handlers);
+    const deals = await db.fetchDeals(client).catch(() => []);
+    const dealInfo = { count: deals.length, buyNow: deals.filter((d) => d.buy_now).length };
+    renderLists(app, lastLists.filter(l => !l.is_template), lastLists.filter(l => l.is_template), handlers, dealInfo);
   } else {
     lastLists = await db.fetchLists(client);
     const list = lastLists.find(l => l.id === state.listId);
@@ -87,6 +94,7 @@ const handlers = {
   onOpenList: (id) => { storeFilter = null; state = { view: "detail", listId: id }; refresh(); },
   onSetStoreFilter: (v) => { storeFilter = v; refresh(); },
   onOpenSettings: () => { state = { view: "settings" }; refresh(); },
+  onOpenDeals: () => { state = { view: "deals" }; refresh(); },
   onBack: () => { state = { view: "lists", listId: null }; refresh(); },
   onNewList: (name) => mutate(() => db.createList(client, { name })),
   onRenameList: (id, name) => mutate(() => db.renameList(client, id, name), [id]),
@@ -293,6 +301,7 @@ function subscribeRealtime() {
   client.channel("db-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "items" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "lists" }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "deals" }, () => refresh())
     .subscribe();
   if (!netListenersBound) {
     netListenersBound = true;

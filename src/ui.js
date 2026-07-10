@@ -387,7 +387,7 @@ function enableHandleReorder(zone, onReorder) {
 }
 
 // ── Lists home ─────────────────────────────────────────────────────────────
-export function renderLists(mount, lists, templates, handlers) {
+export function renderLists(mount, lists, templates, handlers, dealInfo = null) {
   mount.textContent = "";
 
   mount.append(el("div", { class: "bar" },
@@ -398,6 +398,18 @@ export function renderLists(mount, lists, templates, handlers) {
     }, icon("settings"))));
 
   const listEl = el("div", { class: "list" });
+
+  // Shared "Deals this week" banner (from the watcher). Both accounts see it.
+  if (dealInfo && dealInfo.count) {
+    listEl.append(el("button", {
+      type: "button", class: "deals-card", on: { click: () => handlers.onOpenDeals() },
+    },
+      el("span", { class: "deals-card-title", text: "🎯 Deals this week" }),
+      el("span", {
+        class: "deals-card-count",
+        text: dealInfo.buyNow ? `${dealInfo.count} · ${dealInfo.buyNow} to buy now` : `${dealInfo.count}`,
+      })));
+  }
   if (!lists.length) {
     listEl.append(el("p", { class: "muted", text: "No lists yet — create one below" }));
   } else {
@@ -493,6 +505,49 @@ export function renderLists(mount, lists, templates, handlers) {
   mount.append(makeAddBar("New list…", "＋ New list", {
     onSubmit: (name) => handlers.onNewList(name),
   }));
+}
+
+// ── Deals this week (shared, written by the watcher) ─────────────────────────
+export function renderDeals(mount, deals, handlers) {
+  mount.textContent = "";
+  mount.append(el("div", { class: "bar" },
+    el("button", {
+      type: "button", class: "icon-btn", "aria-label": "Back",
+      on: { click: () => handlers.onBack() },
+    }, icon("back")),
+    el("h1", { text: "Deals this week" })));
+
+  const listEl = el("div", { class: "list" });
+  if (!deals || !deals.length) {
+    listEl.append(el("p", { class: "muted",
+      text: "No deals yet — the watcher posts here after its weekly run (Wednesdays)." }));
+  } else {
+    const fmt = (p) => (p != null ? `$${Number(p).toFixed(2)}` : "");
+    const suf = (d) => (d.unit ? `/${d.unit}` : "");
+    const dealRow = (d, hero) => {
+      const meta = [];
+      if (d.was_price) meta.push(`was ${fmt(d.was_price)}`);
+      if (d.discount_pct != null) meta.push(`−${Math.round(d.discount_pct * 100)}%`);
+      if (d.target != null) meta.push(`target ${fmt(d.target)}${suf(d)}`);
+      return el("div", { class: hero ? "deal-row hero" : "deal-row" },
+        el("div", { class: "row-text" },
+          el("span", { class: "name", text: d.item }),
+          el("div", { class: "item-meta" },
+            el("span", { class: "deal-store", text: `${d.merchant || "?"} · ${fmt(d.price)}${suf(d)}` }),
+            meta.length ? el("span", { class: "note", text: meta.join(" · ") }) : null)));
+    };
+    const buyNow = deals.filter((d) => d.buy_now);
+    const others = deals.filter((d) => !d.buy_now);
+    if (buyNow.length) {
+      listEl.append(el("div", { class: "settings-label", text: "🎯 Buy now — hit your target" }));
+      for (const d of buyNow) listEl.append(dealRow(d, true));
+    }
+    if (others.length) {
+      listEl.append(el("div", { class: "settings-label", text: "On sale this week" }));
+      for (const d of others) listEl.append(dealRow(d, false));
+    }
+  }
+  mount.append(listEl);
 }
 
 // ── List detail ─────────────────────────────────────────────────────────────

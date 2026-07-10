@@ -81,6 +81,11 @@ export async function priceStats(client, name) {
     unit: (rows.find((r) => r.unit) || {}).unit || null,
   };
 }
+// Shared "Deals this week" written by the watcher. Buy-now items first.
+export async function fetchDeals(client) {
+  return (await run(client.from("deals").select("*")
+    .order("buy_now", { ascending: false }).order("item"))) || [];
+}
 export async function updateItem(client, id, patch) {
   return run(client.from("items").update(patch).eq("id", id).select().single());
 }

@@ -1061,6 +1061,34 @@ body {
 .target-chip.set { background: var(--ac); color: var(--card); }
 .watch-count { color: var(--ac); font-weight: 600; }
 .name.paused { opacity: 0.5; }
+
+/* Deals this week: home banner + deal rows. */
+.deals-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--ac);
+  color: var(--card);
+  border: none;
+  border-radius: var(--r-card);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.deals-card-count { font-size: var(--fs-sub); opacity: 0.95; }
+.deal-row {
+  margin: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--card);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow);
+}
+.deal-row.hero { border: 2px solid var(--ac); }
+.deal-store { color: var(--tx); font-weight: 600; }
 .new-watchlist-btn {
   display: block;
   width: 100%;
