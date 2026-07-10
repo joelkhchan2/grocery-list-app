@@ -118,31 +118,45 @@ function groupActiveByStore(items) {
 
 // Emoji palette for lists. Tap opens a bottom sheet; picking calls onPick(emoji)
 // and "Remove emoji" calls onPick(null).
-const EMOJI_CHOICES = ["🛒", "🥦", "🍎", "🥕", "🥛", "🧀", "🍞", "🥩", "🐟", "🍗",
-  "🍅", "🧅", "🥚", "🍌", "🍫", "🍪", "🥤", "☕", "🧻", "🧼", "🧴", "🐶", "🐱", "👶",
-  "🎉", "🎂", "🏠", "📦", "🧊", "🌮", "🍕", "🍺"];
+// First grapheme (one emoji) of a string, so extra typed/pasted characters still yield a
+// single emoji. Falls back to the trimmed value if Intl.Segmenter is unavailable.
+function firstEmoji(s) {
+  const t = (s || "").trim();
+  if (!t) return "";
+  try {
+    const seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    return [...seg.segment(t)][0]?.segment || t;
+  } catch { return t; }
+}
 
+// Emoji picker: a text field that surfaces the device's native emoji keyboard (Gboard
+// etc.) so any emoji works — no static grid. onPick(emoji) on Save; onPick(null) clears.
 function showEmojiPicker(onPick) {
   const prev = document.querySelector(".emoji-overlay");
   if (prev) prev.remove();
-  const grid = el("div", { class: "emoji-grid" });
   const overlay = el("div", { class: "emoji-overlay" });
-  for (const e of EMOJI_CHOICES) {
-    grid.append(el("button", {
-      type: "button", class: "emoji-choice", text: e,
-      on: { click: () => { overlay.remove(); onPick(e); } },
-    }));
-  }
-  const sheet = el("div", { class: "emoji-sheet" },
+  const input = el("input", {
+    type: "text", class: "prompt-input emoji-input", maxLength: 12,
+    placeholder: "Tap 😊 on your keyboard", "aria-label": "Emoji",
+    autocomplete: "off", autocapitalize: "off",
+  });
+  const form = el("form", { class: "emoji-sheet" },
     el("div", { class: "emoji-title", text: "Pick an emoji" }),
-    grid,
-    el("button", {
-      type: "button", class: "emoji-clear", text: "Remove emoji",
-      on: { click: () => { overlay.remove(); onPick(null); } },
-    }));
-  overlay.append(sheet);
-  overlay.addEventListener("click", (ev) => { if (ev.target === overlay) overlay.remove(); });
+    input,
+    el("div", { class: "prompt-actions" },
+      el("button", { type: "button", class: "prompt-cancel", text: "Remove",
+        on: { click: () => { overlay.remove(); onPick(null); } } }),
+      el("button", { type: "submit", class: "prompt-save", text: "Save" })));
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = firstEmoji(input.value);
+    overlay.remove();
+    onPick(v || null);
+  });
+  overlay.append(form);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.append(overlay);
+  setTimeout(() => input.focus(), 30);
 }
 
 // Generic bottom-sheet menu. options = [{ label, danger?, onClick }].
@@ -247,6 +261,43 @@ function showStorePicker(current, onPick) {
       type: "button", class: "emoji-clear", text: current ? "Remove store" : "Cancel",
       on: { click: () => { overlay.remove(); if (current) onPick(null); } },
     })));
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.append(overlay);
+}
+
+// Multi-select store picker for scoping a watch. selected = array of store names;
+// onDone(newArray) on Done. Empty array = watch every store.
+function showStoreMultiPicker(selected, onDone) {
+  const prev = document.querySelector(".emoji-overlay");
+  if (prev) prev.remove();
+  const chosen = new Set(selected || []);
+  const overlay = el("div", { class: "emoji-overlay" });
+  const body = el("div", { class: "store-picker" });
+  const group = (label, stores) => {
+    body.append(el("div", { class: "store-group-label", text: label }));
+    for (const s of stores) {
+      const btn = el("button", {
+        type: "button", class: chosen.has(s) ? "store-opt on" : "store-opt", text: s,
+        on: {
+          click: () => {
+            if (chosen.has(s)) chosen.delete(s); else chosen.add(s);
+            btn.className = chosen.has(s) ? "store-opt on" : "store-opt";
+          },
+        },
+      });
+      body.append(btn);
+    }
+  };
+  group("My stores", MY_STORES);
+  group("Other stores", OTHER_STORES);
+  overlay.append(el("div", { class: "emoji-sheet" },
+    el("div", { class: "emoji-title", text: "Stores to watch" }),
+    el("p", { class: "confirm-msg", text: "Leave all off to watch every store." }),
+    body,
+    el("div", { class: "prompt-actions" },
+      el("button", { type: "button", class: "prompt-cancel", text: "Cancel", on: { click: () => overlay.remove() } }),
+      el("button", { type: "button", class: "prompt-save", text: "Done",
+        on: { click: () => { overlay.remove(); onDone([...chosen]); } } }))));
   overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.append(overlay);
 }
@@ -715,6 +766,24 @@ function buildItemRow(item, handlers, opts = {}) {
   }, main, del);
 }
 
+function splitStores(csv) {
+  return (csv || "").split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+// Store chip for a watch row: opens the multi-select picker; shows "All stores",
+// the single store, or "N stores". Empty = watch everywhere.
+function buildWatchStoresChip(item, handlers) {
+  const stores = splitStores(item.watch_stores);
+  const label = stores.length === 0 ? "🛒 All stores"
+    : stores.length === 1 ? `🛒 ${stores[0]}`
+      : `🛒 ${stores.length} stores`;
+  return el("button", {
+    type: "button", class: stores.length ? "store-chip set" : "store-chip",
+    "aria-label": "Stores to watch", text: label,
+    on: { click: () => showStoreMultiPicker(stores, (arr) => handlers.onSetWatchStores(item, arr)) },
+  });
+}
+
 // A watch row: name + target-price chip + store chip. No checkbox/stepper (a watch is
 // never "bought"); the ⋯ menu holds pause/resume + set price. Swipe-to-delete like other rows.
 function buildWatchRow(item, handlers) {
@@ -746,7 +815,7 @@ function buildWatchRow(item, handlers) {
         (v) => handlers.onSetTargetPrice(item, v), { placeholder: "e.g. 4.00 — blank to clear" }),
     },
   });
-  text.append(el("div", { class: "meta-line" }, targetChip, buildStoreChip(item, handlers)));
+  text.append(el("div", { class: "meta-line" }, targetChip, buildWatchStoresChip(item, handlers)));
   if (!item.watch) text.append(el("span", { class: "note", text: "paused — not alerting" }));
   main.append(text);
 

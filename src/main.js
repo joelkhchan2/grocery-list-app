@@ -192,6 +192,7 @@ const handlers = {
           (v) => handlers.onSetExcludeKeywords(it, v), { placeholder: "e.g. hamburger, hot dog, bagel" }) },
     ]);
   },
+  onSetWatchStores: (it, arr) => mutate(() => db.updateItem(client, it.id, { watch_stores: (arr && arr.length) ? arr.join(", ") : null }), [it.id]),
   onSetMatchKeywords: (it, v) => mutate(() => db.updateItem(client, it.id, { match_keywords: (v || "").trim() || null }), [it.id]),
   onSetExcludeKeywords: (it, v) => mutate(() => db.updateItem(client, it.id, { negative_keywords: (v || "").trim() || null }), [it.id]),
   onListMenu: (list) => {
