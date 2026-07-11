@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bySortOrder, idsToClear, watchNames, isSelfEcho } from "../src/model.js";
+import { bySortOrder, idsToClear, watchNames, isSelfEcho, selfEchoKey } from "../src/model.js";
 import { isNumericAmount, stepAmount } from "../src/model.js";
 
 test("bySortOrder sorts by sort_order then created_at", () => {
@@ -22,14 +22,13 @@ test("watchNames returns only watched item names", () => {
   assert.deepEqual(watchNames(items), ["Chicken","Coffee"]);
 });
 
-test("isSelfEcho suppresses own echoes (updates AND just-created ids) and passes remote changes", () => {
-  // main.js adds a created row's real id to `pending` after the insert resolves,
-  // so a create's own echo is suppressed just like an update's.
-  const pending = new Set(["i1", "new-uuid"]);
-  assert.equal(isSelfEcho({ id: "i1" }, pending), true);        // own update echo → skip
-  assert.equal(isSelfEcho({ id: "new-uuid" }, pending), true);  // own create echo → skip
-  assert.equal(isSelfEcho({ id: "remote" }, pending), false);   // real remote change → refresh
-  assert.equal(isSelfEcho(undefined, pending), false);          // null-safe (deleted rows w/ no payload)
+test("isSelfEcho matches own writes by id+updated_at; a partner's later edit passes through", () => {
+  // main.js registers `${id}@${updated_at}` after a write resolves; the matching echo is skipped.
+  const pending = new Set([selfEchoKey({ id: "i1", updated_at: "t1" })]);
+  assert.equal(isSelfEcho({ id: "i1", updated_at: "t1" }, pending), true);   // own echo → skip
+  assert.equal(isSelfEcho({ id: "i1", updated_at: "t2" }, pending), false);  // partner edited same row → refresh
+  assert.equal(isSelfEcho({ id: "remote", updated_at: "t9" }, pending), false);
+  assert.equal(isSelfEcho(undefined, pending), false);                        // null-safe
 });
 
 test("isNumericAmount only true for plain integers", () => {

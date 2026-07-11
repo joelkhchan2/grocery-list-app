@@ -3,7 +3,7 @@ import { currentSession, signIn, signOut, renderSignIn } from "./auth.js";
 import * as db from "./db.js";
 import { renderLists, renderListDetail, renderDeals, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, showEmojiPicker, setMyStores } from "./ui.js";
 import { loadPrefs, savePrefs, applyTheme, applyCustom, resolveActive } from "./theme.js";
-import { isSelfEcho, bySortOrder } from "./model.js";
+import { isSelfEcho, selfEchoKey, bySortOrder } from "./model.js";
 import { emojiOf } from "./category.js";
 
 const app = document.getElementById("app");
@@ -12,8 +12,11 @@ const client = getClient();
 const pending = new Set();          // REAL row ids of in-flight local mutations (self-echo suppression)
 let state = { view: "lists", listId: null };
 let lastLists = [];                 // most recent fetchLists result (for move-target + list menus)
-let lastItems = [];                 // most recent list-detail items (for the item ⋯ menu: reorder)
+let lastItems = [];                 // most recent list-detail items (also the optimistic in-memory copy)
+let lastUsuals = [];                // cached "your usuals" so an optimistic re-render needs no fetch
 let storeFilter = null;             // transient: filter list detail to one store (null = all)
+let refocusAddBar = false;          // after an add, keep the add-bar focused so the keyboard stays open
+let realtimeTimer = null;           // debounce for realtime-driven refreshes
 let netListenersBound = false;      // guards against re-adding window online/offline listeners on re-boot
 let navState = { view: "lists", listId: null };  // mirrors the current screen for history/back sync
 
@@ -47,25 +50,45 @@ function setStatus(msg) {            // transient inline banner (errors / reconn
   if (msg) setTimeout(() => { if (statusEl.textContent === msg) statusEl.hidden = true; }, 4000);
 }
 
-// Run a write; suppress its own realtime echo by the AFFECTED row id(s); surface errors to the user.
-async function mutate(fn, knownIds = []) {
-  knownIds.forEach(id => pending.add(id));
-  let created = [];
+// Register the returned rows' id@updated_at so the write's OWN realtime echo is suppressed
+// (a partner's later edit to the same row has a different updated_at and still refreshes).
+function markSelfEcho(rows) {
+  const keys = [].concat(rows || []).filter(Boolean).map(selfEchoKey);
+  keys.forEach(k => pending.add(k));
+  setTimeout(() => keys.forEach(k => pending.delete(k)), 4000);   // realtime echo arrival window
+}
+
+// Foreground write: run it, then refresh from the server. Use for mutations whose result the
+// UI can't cheaply predict (add, rename, move, reorder, list ops).
+async function mutate(fn) {
   try {
-    const rows = await fn();                         // create/update fns return the affected row (db.js chains .select())
-    created = [].concat(rows || []).map(r => r && r.id).filter(Boolean);
-    created.forEach(id => pending.add(id));           // covers creates whose id we didn't know up front
+    markSelfEcho(await fn());
     await refresh();
-    const all = knownIds.concat(created);
-    setTimeout(() => all.forEach(id => pending.delete(id)), 1500);  // clear after the echo window
   } catch (e) {
-    knownIds.concat(created).forEach(id => pending.delete(id));
     setStatus("Couldn't save — check your connection.");
     try { await refresh(); } catch {}                // revert optimistic view to server truth
   }
 }
 
-async function refresh() {
+// Background write: the caller already updated in-memory state + re-rendered optimistically
+// (instant), so on success we do NOT refetch; on failure we refetch to roll back.
+async function mutateBg(fn) {
+  try {
+    markSelfEcho(await fn());
+  } catch (e) {
+    setStatus("Couldn't save — check your connection.");
+    try { await refresh(); } catch {}
+  }
+}
+
+// Re-render the current view from the IN-MEMORY copies (no network) — for optimistic updates.
+function renderFromMemory() {
+  if (state.view !== "detail") return;
+  const list = lastLists.find(l => l.id === state.listId);
+  if (list) renderListDetail(app, list, lastItems, handlers, sortMode, lastUsuals, storeFilter);
+}
+
+async function doRender() {
   if (state.view === "settings") {
     renderAppearance(app, { ...prefs, haptics }, handlers);   // no data fetch needed
     return;
@@ -83,12 +106,40 @@ async function refresh() {
   } else {
     lastLists = await db.fetchLists(client);
     const list = lastLists.find(l => l.id === state.listId);
-    if (!list) { state = { view: "lists", listId: null }; return refresh(); }
-    const items = await db.fetchItems(client, state.listId);
-    lastItems = items;
-    const usuals = await db.topItems(client).catch(() => []);
-    renderListDetail(app, list, items, handlers, sortMode, usuals, storeFilter);
+    if (!list) { state = { view: "lists", listId: null }; return doRender(); }
+    lastItems = await db.fetchItems(client, state.listId);
+    lastUsuals = await db.topItems(client).catch(() => []);
+    renderListDetail(app, list, lastItems, handlers, sortMode, lastUsuals, storeFilter);
   }
+}
+
+// Full refresh = fetch + render, but preserve scroll position and (after an add) the add-bar
+// focus, so a re-render doesn't snap to top or drop the keyboard.
+async function refresh() {
+  const y = window.scrollY;
+  const prevView = state.view;
+  await doRender();
+  if (state.view === prevView) window.scrollTo(0, y);
+  if (refocusAddBar) {
+    refocusAddBar = false;
+    if (state.view === "detail") { const inp = app.querySelector(".addbar input"); if (inp) inp.focus(); }
+  }
+}
+
+// Don't clobber an active text input or an in-progress drag with a realtime refresh.
+function isBusy() {
+  const a = document.activeElement;
+  const typing = a && app.contains(a) && (a.tagName === "INPUT" || a.tagName === "TEXTAREA");
+  return !!typing || !!document.querySelector(".row.dragging");
+}
+// Coalesce bursts of realtime events (e.g. the weekly ~40-row deals rewrite) into one refresh,
+// and hold off while the user is mid-edit/drag.
+function scheduleRefresh() {
+  clearTimeout(realtimeTimer);
+  realtimeTimer = setTimeout(() => {
+    if (isBusy()) { scheduleRefresh(); return; }
+    refresh();
+  }, 300);
 }
 
 // Navigate to a screen and record it in browser history, so the Pixel/OS back button (and
@@ -111,6 +162,7 @@ const handlers = {
   onDeleteList: (id) => mutate(() => db.deleteList(client, id), [id]),
   onAddItem: (name) => {
     clearTimeout(addQueryTimer);
+    refocusAddBar = true;                              // keep the keyboard up for the next item
     mutate(() => db.addItem(client, state.listId, { name, amount: "1", note: null, emoji: emojiOf(name) }));
   },
   onNewWatchList: (name) => mutate(() => db.createList(client, { name, is_watchlist: true })),
@@ -123,9 +175,19 @@ const handlers = {
       return row && row.id ? db.updateItem(client, row.id, { watch: true }) : row;
     });
   },
-  onToggleCheck: (it) => { haptic(8); return mutate(() => db.updateItem(client, it.id, { checked: !it.checked }), [it.id]); },
+  onToggleCheck: (it) => {
+    haptic(8);
+    const next = !it.checked;
+    const t = lastItems.find(i => i.id === it.id);
+    if (t) { t.checked = next; const y = window.scrollY; renderFromMemory(); window.scrollTo(0, y); }  // instant
+    return mutateBg(() => db.updateItem(client, it.id, { checked: next }));
+  },
   onToggleWatch: (it) => mutate(() => db.updateItem(client, it.id, { watch: !it.watch }), [it.id]),
-  onAmount: (it, amount) => mutate(() => db.updateItem(client, it.id, { amount }), [it.id]),
+  onAmount: (it, amount) => {
+    const t = lastItems.find(i => i.id === it.id);
+    if (t) { t.amount = amount; const y = window.scrollY; renderFromMemory(); window.scrollTo(0, y); }  // instant
+    return mutateBg(() => db.updateItem(client, it.id, { amount }));
+  },
   onEditAmount: (it, amount) => mutate(() => db.updateItem(client, it.id, { amount }), [it.id]),
   onEditItem: (it, name) => mutate(() => db.updateItem(client, it.id, { name }), [it.id]),
   onEditNote: (it, note) => mutate(() => db.updateItem(client, it.id, { note }), [it.id]),
@@ -277,6 +339,7 @@ const handlers = {
   },
   onPickSuggestion: (row) => {
     clearTimeout(addQueryTimer);
+    refocusAddBar = true;
     mutate(() => db.addItem(client, state.listId,
       { name: row.name, amount: row.last_amount || "1", note: row.last_note || null, emoji: emojiOf(row.name) }));
   },
@@ -315,11 +378,13 @@ function subscribeRealtime() {
   client.removeAllChannels();       // drop any prior subscription so re-sign-in doesn't stack channels
   // Server-authoritative: any change refetches & replaces. Out-of-order events are inherently
   // safe (we always render the latest full fetch); own echoes are dropped via the pending set.
-  const onChange = (p) => { if (!isSelfEcho(p.new || p.old, pending)) refresh(); };
+  const onChange = (p) => { if (!isSelfEcho(p.new || p.old, pending)) scheduleRefresh(); };
   client.channel("db-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "items" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "lists" }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "deals" }, () => refresh())
+    // Deals only surface on the home view; ignore their (bulk, weekly) churn elsewhere.
+    .on("postgres_changes", { event: "*", schema: "public", table: "deals" },
+      () => { if (state.view === "lists") scheduleRefresh(); })
     .subscribe();
   if (!netListenersBound) {
     netListenersBound = true;

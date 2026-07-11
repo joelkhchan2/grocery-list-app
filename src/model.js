@@ -13,4 +13,9 @@ export function idsToClear(items) {
 export function watchNames(items) {
   return items.filter(i => i.watch).map(i => i.name);
 }
-export function isSelfEcho(row, pendingIds) { return pendingIds.has(row?.id); }
+// Self-echo suppression keyed on id + updated_at (not bare id): our own writes register
+// `${id}@${updated_at}` tokens, so the matching realtime echo is skipped but a PARTNER's later
+// edit to the same row (different updated_at) still refreshes. Delete echoes (no reliable
+// updated_at) simply fall through and trigger a harmless refetch.
+export function selfEchoKey(row) { return row ? `${row.id}@${row.updated_at}` : ""; }
+export function isSelfEcho(row, pending) { return !!row && pending.has(selfEchoKey(row)); }
