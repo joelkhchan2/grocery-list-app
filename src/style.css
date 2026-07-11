@@ -195,6 +195,8 @@ body {
   max-width: calc(100vw - 2 * var(--space-4));
 }
 #status[hidden] { display: none; }
+/* Persistent offline banner: amber, high-contrast, distinct from the neutral toast. */
+#status.warn { background: #7c4a03; color: #ffe8c2; }
 
 /* ── Top bar ─────────────────────────────────────────────────────────── */
 .bar {

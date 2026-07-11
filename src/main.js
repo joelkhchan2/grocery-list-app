@@ -43,11 +43,31 @@ function haptic(ms = 10) {
 // Expose so the UI layer can buzz on drag-grab / check without importing main.
 window.__glHaptic = haptic;
 
-function setStatus(msg) {            // transient inline banner (errors / reconnecting)
+const OFFLINE_MSG = "You're offline — changes won't be saved until you reconnect.";
+let offline = typeof navigator !== "undefined" && navigator.onLine === false;
+let statusTimer = null;
+
+function paintStatus(msg, warn) {
   if (!statusEl) return;
   statusEl.textContent = msg || "";
   statusEl.hidden = !msg;
-  if (msg) setTimeout(() => { if (statusEl.textContent === msg) statusEl.hidden = true; }, 4000);
+  statusEl.classList.toggle("warn", !!warn && !!msg);
+}
+
+// Transient toast (save errors, etc.). Auto-hides after 4s; when it clears, we fall back
+// to the persistent offline banner if the device is still offline.
+function setStatus(msg) {
+  clearTimeout(statusTimer);
+  paintStatus(msg, false);
+  if (msg) statusTimer = setTimeout(() => paintStatus(offline ? OFFLINE_MSG : "", offline), 4000);
+}
+
+// Persistent offline state. When offline, writes hit Supabase directly and fail, so we set
+// expectations up front with a standing banner rather than a transient one.
+function setOffline(v) {
+  offline = !!v;
+  clearTimeout(statusTimer);        // offline state overrides any lingering transient toast
+  paintStatus(offline ? OFFLINE_MSG : "", offline);
 }
 
 // Register the returned rows' id@updated_at so the write's OWN realtime echo is suppressed
@@ -407,11 +427,15 @@ function subscribeRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "deals" },
       () => { if (state.view === "lists") scheduleRefresh(); })
     .subscribe();
-  if (!netListenersBound) {
-    netListenersBound = true;
-    window.addEventListener("online", () => { setStatus(""); refresh(); });
-    window.addEventListener("offline", () => setStatus("Reconnecting…"));
-  }
+}
+
+// Bound once, early in boot — so reconnect recovery works even if we first loaded offline
+// (Supabase's own socket auto-reconnects when the network returns; we just re-fetch).
+function bindNetListeners() {
+  if (netListenersBound) return;
+  netListenersBound = true;
+  window.addEventListener("online", () => { setOffline(false); refresh().catch(() => {}); });
+  window.addEventListener("offline", () => setOffline(true));
 }
 
 // OS/browser back button: if a sheet/dialog is open, back closes it (staying on the screen);
@@ -430,9 +454,11 @@ window.addEventListener("popstate", (e) => {
 });
 
 async function boot() {
+  bindNetListeners();
+  if (offline) setOffline(true);          // surface the standing banner if we booted offline
   const session = await currentSession(client);
   if (!session) { renderSignIn(app, async (email, pw) => { await signIn(client, email, pw); boot(); }); return; }
-  await refresh();
+  try { await refresh(); } catch { setOffline(!navigator.onLine); }   // don't let an offline fetch abort setup
   navState = { view: "lists", listId: null };
   try { history.replaceState({ gl: navState }, ""); } catch { /* ignore */ }
   subscribeRealtime();
