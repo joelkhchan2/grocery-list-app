@@ -81,7 +81,8 @@ const EMOJI_KEYWORDS = [
   ["banana", "🍌"], ["apple", "🍎"], ["orange", "🍊"], ["lemon", "🍋"], ["lime", "🍋"],
   ["grape", "🍇"], ["strawberr", "🍓"], ["blueberr", "🫐"], ["raspberr", "🍓"], ["berry", "🍓"],
   ["watermelon", "🍉"], ["melon", "🍈"], ["mango", "🥭"], ["peach", "🍑"], ["pear", "🍐"],
-  ["cherry", "🍒"], ["pineapple", "🍍"], ["avocado", "🥑"], ["eggplant", "🍆"], ["tomato", "🍅"],
+  ["cherry", "🍒"], ["pineapple", "🍍"], ["grapefruit", "🍊"], ["avocado", "🥑"], ["eggplant", "🍆"], ["tomato", "🍅"],
+  ["pepperoni", "🍕"],
   ["potato", "🥔"], ["onion", "🧅"], ["garlic", "🧄"], ["carrot", "🥕"], ["corn", "🌽"],
   ["broccoli", "🥦"], ["cucumber", "🥒"], ["mushroom", "🍄"], ["lettuce", "🥬"], ["spinach", "🥬"],
   ["kale", "🥬"], ["cabbage", "🥬"], ["pepper", "🫑"], ["chili", "🌶️"], ["ginger", "🫚"],
@@ -125,10 +126,14 @@ const CATEGORY_EMOJI = {
   "Household": "🧽", "Personal Care": "🧴", "Baby & Pet": "🍼",
 };
 
+// Longest keyword first, so a specific term beats a generic substring it contains
+// (pineapple before apple, grapefruit before grape, pepperoni before pepper).
+const EMOJI_BY_LEN = [...EMOJI_KEYWORDS].sort((a, b) => b[0].length - a[0].length);
+
 // Best-guess emoji for an item name: a specific keyword match, else the category default,
 // else null (unknown → no auto-emoji rather than a wrong one).
 export function emojiOf(name) {
   const n = ` ${String(name || "").toLowerCase()} `;
-  for (const [kw, em] of EMOJI_KEYWORDS) if (n.includes(kw)) return em;
+  for (const [kw, em] of EMOJI_BY_LEN) if (n.includes(kw)) return em;
   return CATEGORY_EMOJI[categoryOf(name)] || null;
 }

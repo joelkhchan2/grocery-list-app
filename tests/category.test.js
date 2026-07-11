@@ -31,6 +31,9 @@ test("emojiOf uses specific keyword, then category default, then null", () => {
   assert.equal(emojiOf("Peanut butter"), "🥜");       // specific beats "butter"
   assert.equal(emojiOf("Sourdough bread"), "🍞");
   assert.equal(emojiOf("Sekka rice"), "🍚");
+  assert.equal(emojiOf("Pineapple"), "🍍");             // specific beats "apple"
+  assert.equal(emojiOf("Ruby grapefruit"), "🍊");       // beats "grape"
+  assert.equal(emojiOf("Pepperoni sticks"), "🍕");      // beats "pepper"
   assert.equal(emojiOf("Some obscure thing"), null);   // unknown → no auto-emoji
   // category default when no specific keyword: a Pantry item with no keyword hit
   assert.equal(emojiOf("Cornstarch"), "🌽");           // "corn" keyword → produce corn

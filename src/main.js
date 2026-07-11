@@ -3,7 +3,7 @@ import { currentSession, signIn, signOut, renderSignIn } from "./auth.js";
 import * as db from "./db.js";
 import { renderLists, renderListDetail, renderDeals, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, showEmojiPicker, setMyStores } from "./ui.js";
 import { loadPrefs, savePrefs, applyTheme, applyCustom, resolveActive } from "./theme.js";
-import { isSelfEcho, idsToClear, bySortOrder } from "./model.js";
+import { isSelfEcho, bySortOrder } from "./model.js";
 import { emojiOf } from "./category.js";
 
 const app = document.getElementById("app");
@@ -150,9 +150,17 @@ const handlers = {
     // reinsertItem (not addItem) preserves watch/checked/sort_order so an undone watch still feeds the watcher.
     showUndo(document.body, it.name, () => mutate(() => db.reinsertItem(client, it)));
   },
-  onClearChecked: (items) => mutate(() => db.clearChecked(client, items), idsToClear(items)),
-  onCheckAll: () => mutate(() => db.checkAll(client, state.listId, true)),
-  onUncheckAll: () => mutate(() => db.checkAll(client, state.listId, false)),
+  onClearChecked: (items) => {
+    // `items` is the currently VISIBLE set (store-filtered by the caller). Only checked,
+    // non-watch items are removed; offer a batch Undo.
+    const removable = items.filter((i) => i.checked && !i.watch);
+    if (!removable.length) return;
+    mutate(() => db.clearChecked(client, items), removable.map((i) => i.id));
+    showUndo(document.body, `${removable.length} item${removable.length === 1 ? "" : "s"}`,
+      () => mutate(() => db.reinsertItems(client, removable)));
+  },
+  onCheckAll: (ids) => mutate(() => db.checkItems(client, ids, true), ids || []),
+  onUncheckAll: (ids) => mutate(() => db.checkItems(client, ids, false), ids || []),
   onReorder: (ids) => mutate(() => db.reorderItems(client, ids), ids),
   onReorderLists: (ids) => mutate(() => db.reorderLists(client, ids), ids),
   onMoveItem: (it, listId) => mutate(() => db.moveItem(client, it.id, listId), [it.id]),
@@ -162,7 +170,7 @@ const handlers = {
   onItemMenu: (it) => {
     const opts = [{
       label: it.emoji ? `${it.emoji} Change emoji` : "😊 Add emoji",
-      onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e)),
+      onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e), it.emoji),
     }, {
       label: it.watch ? "Stop watching for deals" : "🔔 Watch for deals",
       onClick: () => handlers.onToggleWatch(it),
@@ -200,7 +208,7 @@ const handlers = {
   onWatchItemMenu: (it) => {
     showSheet(it.name, [
       { label: it.emoji ? `${it.emoji} Change emoji` : "😊 Add emoji",
-        onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e)) },
+        onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e), it.emoji) },
       { label: it.watch ? "⏸ Pause alerts" : "▶ Resume alerts", onClick: () => handlers.onToggleWatch(it) },
       { label: it.target_price != null
           ? `🎯 Deal price: $${Number(it.target_price).toFixed(2)} (edit)`

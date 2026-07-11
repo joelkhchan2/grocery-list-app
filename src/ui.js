@@ -131,12 +131,12 @@ function firstEmoji(s) {
 
 // Emoji picker: a text field that surfaces the device's native emoji keyboard (Gboard
 // etc.) so any emoji works — no static grid. onPick(emoji) on Save; onPick(null) clears.
-export function showEmojiPicker(onPick) {
+export function showEmojiPicker(onPick, current = null) {
   const prev = document.querySelector(".emoji-overlay");
   if (prev) prev.remove();
   const overlay = el("div", { class: "emoji-overlay" });
   const input = el("input", {
-    type: "text", class: "prompt-input emoji-input", maxLength: 12,
+    type: "text", class: "prompt-input emoji-input", maxLength: 12, value: current || "",
     placeholder: "Tap 😊 on your keyboard", "aria-label": "Emoji",
     autocomplete: "off", autocapitalize: "off",
   });
@@ -144,8 +144,11 @@ export function showEmojiPicker(onPick) {
     el("div", { class: "emoji-title", text: "Pick an emoji" }),
     input,
     el("div", { class: "prompt-actions" },
-      el("button", { type: "button", class: "prompt-cancel", text: "Remove",
-        on: { click: () => { overlay.remove(); onPick(null); } } }),
+      // Remove only when there's an emoji to clear; Cancel just closes (no change).
+      current ? el("button", { type: "button", class: "color-clear", text: "Remove",
+        on: { click: () => { overlay.remove(); onPick(null); } } }) : null,
+      el("button", { type: "button", class: "prompt-cancel", text: "Cancel",
+        on: { click: () => overlay.remove() } }),
       el("button", { type: "submit", class: "prompt-save", text: "Save" })));
   form.addEventListener("submit", (e) => {
     e.preventDefault();
@@ -429,7 +432,7 @@ export function renderLists(mount, lists, templates, handlers, dealInfo = null) 
         on: {
           click: (e) => {
             e.stopPropagation();
-            showEmojiPicker((emoji) => handlers.onSetListEmoji(list.id, emoji));
+            showEmojiPicker((emoji) => handlers.onSetListEmoji(list.id, emoji), list.emoji);
           },
         },
       }));
@@ -638,13 +641,13 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
     if (active.length) {
       bulk.append(el("button", {
         type: "button", class: "bulk-btn", text: "Check all",
-        on: { click: () => handlers.onCheckAll() },
+        on: { click: () => handlers.onCheckAll(active.map((i) => i.id)) },   // only the visible/filtered rows
       }));
     }
     if (done.length) {
       bulk.append(el("button", {
         type: "button", class: "bulk-btn", text: "Uncheck all",
-        on: { click: () => handlers.onUncheckAll() },
+        on: { click: () => handlers.onUncheckAll(done.map((i) => i.id)) },
       }));
     }
     if (bulk.children.length) listEl.append(bulk);
@@ -675,7 +678,7 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
           el("button", {
             type: "button", class: "clear-checked", text: "Clear checked",
             on: {
-              click: (e) => { e.preventDefault(); e.stopPropagation(); handlers.onClearChecked(items); },
+              click: (e) => { e.preventDefault(); e.stopPropagation(); handlers.onClearChecked(done); },
             },
           })),
         body));
@@ -724,7 +727,7 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
 function emojiLead(item, handlers) {
   return el("button", {
     type: "button", class: "item-emoji", text: item.emoji, "aria-label": "Change emoji",
-    on: { click: (e) => { e.stopPropagation(); showEmojiPicker((em) => handlers.onSetItemEmoji(item, em)); } },
+    on: { click: (e) => { e.stopPropagation(); showEmojiPicker((em) => handlers.onSetItemEmoji(item, em), item.emoji); } },
   });
 }
 
