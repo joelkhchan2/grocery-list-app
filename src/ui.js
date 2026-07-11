@@ -835,8 +835,10 @@ function buildItemRow(item, handlers, opts = {}) {
       on: { click: (e) => inlineEdit(e.currentTarget, item.amount, (v) => { const t = v.trim(); if (t && t !== String(item.amount || "").trim()) handlers.onEditAmount(item, t); }, { placeholder: "e.g. 500 g" }) } });
   }
 
-  // Line 2: who · flags · store chip kept together (badge never orphans) on the left,
-  // amount on the right.
+  // Line 2: who · flags kept clustered (badge never orphans), then the store chip. The
+  // chip is a sibling of the cluster in the wrapping meta-line, so on a crowded row
+  // (who + watch + target + store) it wraps to its own line and stays readable rather
+  // than shrinking to an unreadable icon.
   const primary = el("div", { class: "meta-primary" });
   const who = item.created_by && MEMBERS[item.created_by];
   if (who) {
@@ -851,8 +853,7 @@ function buildItemRow(item, handlers, opts = {}) {
       text: `🎯 ≤ $${Number(item.target_price).toFixed(2)}`,
       title: "Deal-price alert target" }));
   }
-  primary.append(buildStoreChip(item, handlers));
-  text.append(el("div", { class: "meta-line" }, primary));   // line 2: store + flags, full width
+  text.append(el("div", { class: "meta-line" }, primary, buildStoreChip(item, handlers)));   // line 2
 
   // Line 3: note (left, truncates if long) + amount control (right).
   const noteEl = item.note
