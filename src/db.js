@@ -36,17 +36,25 @@ export async function fetchItems(client, listId) {
     client.from("items").select("*").eq("list_id", listId).order("sort_order")));
 }
 export async function addItem(client, listId, { name, amount = "1", note = null, emoji = null }) {
-  const insert = { list_id: listId, name, amount, note };
+  // Append after the current max sort_order (not 0 — otherwise new items collide at row 0).
+  const last = await run(client.from("items").select("sort_order").eq("list_id", listId)
+    .order("sort_order", { ascending: false }).limit(1));
+  const nextOrder = (last && last[0] ? (last[0].sort_order || 0) : 0) + 1;
+  const insert = { list_id: listId, name, amount, note, sort_order: nextOrder };
   if (emoji) insert.emoji = emoji;                    // auto-emoji guess; only send when we have one
   const row = await run(client.from("items").insert(insert).select().single());
   try { await historyUpsert(client, { name, amount, note }); } catch { /* non-fatal */ }
   return row;
 }
+// Undo: restore the FULL deleted row (every column: watch/target/emoji/store/keywords/…);
+// the DB reassigns id + timestamps.
 export async function reinsertItem(client, row) {
-  // Undo: restore the full deleted row (watch/checked/sort_order preserved; a new id is fine).
-  const { list_id, name, amount = "1", note = null, watch = false, checked = false, sort_order = 0 } = row;
-  return run(client.from("items")
-    .insert({ list_id, name, amount, note, watch, checked, sort_order }).select().single());
+  const { id, created_at, updated_at, ...rest } = row;
+  return run(client.from("items").insert(rest).select().single());
+}
+export async function reinsertItems(client, rows) {
+  const payload = (rows || []).map(({ id, created_at, updated_at, ...rest }) => rest);
+  return payload.length ? run(client.from("items").insert(payload).select()) : [];
 }
 export async function historyUpsert(client, { name, amount = null, note = null }) {
   const trimmed = String(name).trim();
@@ -56,9 +64,11 @@ export async function historyUpsert(client, { name, amount = null, note = null }
   }, { onConflict: "name_key" }));
 }
 export async function recentItems(client, prefix, limit = 6) {
-  if (!prefix || !prefix.trim()) return [];
+  const p = (prefix || "").trim();
+  if (!p) return [];
+  const esc = p.replace(/[\\%_]/g, (c) => "\\" + c);   // treat "2%", "1/2" etc. literally in LIKE
   return run(client.from("item_history").select("*")
-    .ilike("name", prefix.trim() + "%").order("last_used", { ascending: false }).limit(limit));
+    .ilike("name", esc + "%").order("last_used", { ascending: false }).limit(limit));
 }
 // "Your usuals" — most-recently-used items regardless of prefix (for quick-add chips).
 export async function topItems(client, limit = 12) {
@@ -92,24 +102,25 @@ export async function updateItem(client, id, patch) {
 export async function deleteItem(client, id) {
   return run(client.from("items").delete().eq("id", id));
 }
+// Delete checked (non-watched) items in ONE request; returns the deleted ids (for self-echo).
 export async function clearChecked(client, items) {
-  for (const id of idsToClear(items)) await deleteItem(client, id);
+  const ids = idsToClear(items);
+  if (ids.length) await run(client.from("items").delete().in("id", ids));
+  return ids;
 }
-// Persist a new order: set each row's sort_order to its index.
+// Check / uncheck a specific set of ids in one request (scoped to the visible/filtered rows).
+// .select() returns the affected rows so the caller can suppress their realtime self-echoes.
+export async function checkItems(client, ids, checked) {
+  if (!ids || !ids.length) return [];
+  return run(client.from("items").update({ checked }).in("id", ids).select());
+}
+// Persist a new order (sort_order = index). Fired in parallel so a big drag is one round-trip
+// deep instead of N sequential writes.
 export async function reorderItems(client, ids) {
-  for (let i = 0; i < ids.length; i++) {
-    await run(client.from("items").update({ sort_order: i }).eq("id", ids[i]));
-  }
+  await Promise.all(ids.map((id, i) => run(client.from("items").update({ sort_order: i }).eq("id", id))));
 }
 export async function reorderLists(client, ids) {
-  for (let i = 0; i < ids.length; i++) {
-    await run(client.from("lists").update({ sort_order: i }).eq("id", ids[i]));
-  }
-}
-// Bulk check / uncheck every item in a list (one request). .select() returns the
-// affected rows so the caller can suppress their realtime self-echoes.
-export async function checkAll(client, listId, checked) {
-  return run(client.from("items").update({ checked }).eq("list_id", listId).select());
+  await Promise.all(ids.map((id, i) => run(client.from("lists").update({ sort_order: i }).eq("id", id))));
 }
 // Move an item to a different list.
 export async function moveItem(client, id, listId) {
@@ -120,14 +131,16 @@ export async function moveItem(client, id, listId) {
 async function copyList(client, listId, { isTemplate = false, suffix = "" }) {
   const src = (await run(client.from("lists").select("*").eq("id", listId)))?.[0];
   if (!src) return null;
-  const newList = await run(client.from("lists")
-    .insert({ name: `${src.name}${suffix}`, emoji: src.emoji, is_template: isTemplate })
-    .select().single());
+  const listRow = { name: `${src.name}${suffix}`, emoji: src.emoji, is_template: isTemplate };
+  if (src.is_watchlist) listRow.is_watchlist = true;   // a duplicated/template'd watch list stays one
+  const newList = await run(client.from("lists").insert(listRow).select().single());
   const items = (await run(client.from("items").select("*").eq("list_id", listId))) || [];
   if (items.length) {
     await run(client.from("items").insert(items.map((it) => ({
-      list_id: newList.id, name: it.name, amount: it.amount, note: it.note,
-      store: it.store, watch: it.watch, emoji: it.emoji, sort_order: it.sort_order, checked: false,
+      list_id: newList.id, name: it.name, amount: it.amount, note: it.note, store: it.store,
+      watch: it.watch, emoji: it.emoji, sort_order: it.sort_order, checked: false,
+      target_price: it.target_price, target_unit: it.target_unit, match_keywords: it.match_keywords,
+      negative_keywords: it.negative_keywords, watch_stores: it.watch_stores,   // carry watch tuning
     }))));
   }
   return newList;

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fetchLists, fetchItems, addItem, updateItem, clearChecked, recentItems, reinsertItem } from "../src/db.js";
+import { fetchLists, fetchItems, addItem, updateItem, clearChecked, recentItems, reinsertItem, duplicateList } from "../src/db.js";
 
 // Fake mirroring supabase-js v2 semantics closely enough to catch real bugs:
 // insert/update return null data UNLESS .select() is chained (return=minimal default);
@@ -17,6 +17,7 @@ function fakeClient(canned = {}) {
     q.delete = () => { mode = "delete"; calls.push(["delete", table]); return q; };
     q.upsert = (rows, opts) => { mode = "upsert"; payload = rows; calls.push(["upsert", table, rows]); return q; };
     q.eq = () => q;
+    q.in = () => q;
     q.order = () => q;
     q.ilike = () => q;
     q.limit = () => q;
@@ -114,9 +115,49 @@ test("mutations without .select() return null (contract guard — proves the fak
   assert.equal(data, null);
 });
 
-test("clearChecked deletes only checked non-watched", async () => {
+test("clearChecked deletes checked non-watched in ONE request and returns their ids", async () => {
   const c = fakeClient();
-  await clearChecked(c, [{id:"a",checked:true,watch:false},{id:"b",checked:true,watch:true}]);
+  const ids = await clearChecked(c, [
+    { id: "a", checked: true, watch: false }, { id: "b", checked: true, watch: true },
+    { id: "c", checked: false, watch: false },
+  ]);
   const deletes = c._calls.filter(x => x[0] === "delete");
-  assert.equal(deletes.length, 1); // only "a"
+  assert.equal(deletes.length, 1);       // single batched delete, not per-id
+  assert.deepEqual(ids, ["a"]);          // checked & non-watch only; returned for Undo/self-echo
+});
+
+test("reinsertItem restores ALL columns (emoji/target/keywords) minus id + timestamps", async () => {
+  const c = fakeClient();
+  await reinsertItem(c, { id: "old", created_at: "t0", updated_at: "t1", list_id: "l1", name: "Cheese",
+    emoji: "🧀", store: "No Frills", watch: true, target_price: 4.99, target_unit: "lb",
+    match_keywords: "cheese", negative_keywords: "snack", watch_stores: "Metro", sort_order: 3 });
+  const ins = c._calls.find(x => x[0] === "insert")[2];
+  assert.equal(ins.emoji, "🧀");
+  assert.equal(ins.target_price, 4.99);
+  assert.equal(ins.watch_stores, "Metro");
+  assert.equal(ins.id, undefined);       // DB reassigns id + timestamps
+  assert.equal(ins.created_at, undefined);
+});
+
+test("addItem appends after the current max sort_order", async () => {
+  const c = fakeClient({ items: [{ sort_order: 5 }] });
+  await addItem(c, "l1", { name: "Eggs" });
+  const ins = c._calls.find(x => x[0] === "insert")[2];
+  assert.equal(ins.sort_order, 6);
+});
+
+test("duplicateList preserves is_watchlist and item watch tuning", async () => {
+  const c = fakeClient({
+    lists: [{ id: "w", name: "Watches", emoji: null, is_watchlist: true, is_template: false }],
+    items: [{ name: "Chicken", amount: "1", note: null, store: null, watch: true, emoji: "🍗",
+      sort_order: 0, target_price: 4.99, target_unit: "lb", match_keywords: "chicken breast",
+      negative_keywords: "wings", watch_stores: "Walmart" }],
+  });
+  await duplicateList(c, "w");
+  const listIns = c._calls.filter(x => x[0] === "insert" && x[1] === "lists")[0][2];
+  assert.equal(listIns.is_watchlist, true);
+  const itemIns = c._calls.filter(x => x[0] === "insert" && x[1] === "items")[0][2];
+  assert.equal(itemIns[0].target_price, 4.99);
+  assert.equal(itemIns[0].watch_stores, "Walmart");
+  assert.equal(itemIns[0].checked, false);
 });

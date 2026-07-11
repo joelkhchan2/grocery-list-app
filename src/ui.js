@@ -638,13 +638,13 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
     if (active.length) {
       bulk.append(el("button", {
         type: "button", class: "bulk-btn", text: "Check all",
-        on: { click: () => handlers.onCheckAll() },
+        on: { click: () => handlers.onCheckAll(active.map((i) => i.id)) },   // only the visible/filtered rows
       }));
     }
     if (done.length) {
       bulk.append(el("button", {
         type: "button", class: "bulk-btn", text: "Uncheck all",
-        on: { click: () => handlers.onUncheckAll() },
+        on: { click: () => handlers.onUncheckAll(done.map((i) => i.id)) },
       }));
     }
     if (bulk.children.length) listEl.append(bulk);
@@ -675,7 +675,7 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
           el("button", {
             type: "button", class: "clear-checked", text: "Clear checked",
             on: {
-              click: (e) => { e.preventDefault(); e.stopPropagation(); handlers.onClearChecked(items); },
+              click: (e) => { e.preventDefault(); e.stopPropagation(); handlers.onClearChecked(done); },
             },
           })),
         body));
