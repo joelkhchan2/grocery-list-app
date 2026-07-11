@@ -1088,7 +1088,14 @@ body {
   box-shadow: var(--shadow);
 }
 .deal-row.hero { border: 2px solid var(--ac); }
-.deal-store { color: var(--tx); font-weight: 600; }
+.deal-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.deal-head .row-text { min-width: 0; }        /* let the name ellipsize instead of shoving the price off */
+.deal-head .name { font-weight: 600; }
+.deal-sub { display: block; color: var(--sub); font-size: var(--fs-sub); margin-top: 2px; }
+.deal-price { flex: none; font-weight: 700; font-size: 1.15em; white-space: nowrap; }
+.deal-row.hero .deal-price { color: var(--ac); }
+.deal-meta { color: var(--sub); font-size: var(--fs-sub); margin-top: var(--space-2); }
+.deal-fresh { color: var(--sub); font-size: var(--fs-sub); margin: 0 var(--space-4) var(--space-2); }
 .new-watchlist-btn {
   display: block;
   width: 100%;

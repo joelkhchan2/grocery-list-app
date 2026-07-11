@@ -564,17 +564,31 @@ export function renderDeals(mount, deals, handlers) {
   } else {
     const fmt = (p) => (p != null ? `$${Number(p).toFixed(2)}` : "");
     const suf = (d) => (d.unit ? `/${d.unit}` : "");
+    // Freshness: the watcher rewrites the whole feed each run, so the newest created_at
+    // is when these deals were posted. Show it (plus the flyer week, if tagged) up top.
+    const stamp = deals.reduce((m, d) => (d.created_at && d.created_at > m ? d.created_at : m), "");
+    const week = (deals.find((d) => d.week_label) || {}).week_label;
+    if (stamp) {
+      let when = stamp;
+      try { when = new Date(stamp).toLocaleDateString(undefined, { month: "short", day: "numeric" }); } catch { /* keep raw */ }
+      listEl.append(el("p", { class: "deal-fresh",
+        text: `Updated ${when}${week ? ` · ${week}` : ""}` }));
+    }
     const dealRow = (d, hero) => {
       const meta = [];
       if (d.was_price) meta.push(`was ${fmt(d.was_price)}`);
       if (d.discount_pct != null) meta.push(`−${Math.round(d.discount_pct * 100)}%`);
       if (d.target != null) meta.push(`target ${fmt(d.target)}${suf(d)}`);
+      if (d.valid_to) meta.push(`until ${d.valid_to}`);
+      // Sub-line: which store, and the flyer's product name when it differs from the watch item.
+      const sub = [d.merchant || "?", d.name && d.name !== d.item ? d.name : null].filter(Boolean).join(" · ");
       return el("div", { class: hero ? "deal-row hero" : "deal-row" },
-        el("div", { class: "row-text" },
-          el("span", { class: "name", text: d.item }),
-          el("div", { class: "item-meta" },
-            el("span", { class: "deal-store", text: `${d.merchant || "?"} · ${fmt(d.price)}${suf(d)}` }),
-            meta.length ? el("span", { class: "note", text: meta.join(" · ") }) : null)));
+        el("div", { class: "deal-head" },
+          el("div", { class: "row-text" },
+            el("span", { class: "name", text: d.item }),
+            sub ? el("span", { class: "deal-sub", text: sub }) : null),
+          el("span", { class: "deal-price", text: `${fmt(d.price)}${suf(d)}` })),
+        meta.length ? el("div", { class: "deal-meta", text: meta.join(" · ") }) : null);
     };
     const buyNow = deals.filter((d) => d.buy_now);
     const others = deals.filter((d) => !d.buy_now);
