@@ -24,6 +24,19 @@
       var ac = localStorage.getItem("glColAc"); if (ac) root.style.setProperty("--ac", ac);
       var tx = localStorage.getItem("glColTx"); if (tx) root.style.setProperty("--tx", tx);
       var bg = localStorage.getItem("glColBg"); if (bg) root.style.setProperty("--bg", bg);
+      // Derive dependent tokens (mirror theme.js applyCustom) so a custom dark bg doesn't
+      // flash unreadable (preset-white) cards before the module runs.
+      var lum = function (h) { var m = /^#?([0-9a-f]{6})$/i.exec(h || ""); if (!m) return null;
+        var n = parseInt(m[1], 16), c = function (s) { var v = ((n >> s) & 255) / 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+        return 0.2126 * c(16) + 0.7152 * c(8) + 0.0722 * c(0); };
+      if (bg) {
+        var dark = (lum(bg) == null ? 1 : lum(bg)) < 0.5, into = dark ? "white" : "black";
+        root.style.setProperty("--card", "color-mix(in srgb, " + bg + " 88%, " + into + ")");
+        root.style.setProperty("--border", "color-mix(in srgb, " + bg + " 74%, " + into + ")");
+        root.style.setProperty("--sub", "color-mix(in srgb, " + (tx || (dark ? "white" : "black")) + " 60%, " + bg + ")");
+      }
+      if (ac) root.style.setProperty("--ontop", (lum(ac) == null ? 0 : lum(ac)) > 0.5 ? "#1a1a1a" : "#ffffff");
       var fonts = {
         system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         rounded: '"Nunito", "Segoe UI", system-ui, sans-serif',

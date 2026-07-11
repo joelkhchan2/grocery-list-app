@@ -19,10 +19,13 @@ export function renderSignIn(mount, onSubmit) {
       <p class="err" hidden></p>
     </form>`;
   const form = mount.querySelector("form");
+  const btn = form.querySelector("button[type=submit]");
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const err = form.querySelector(".err"); err.hidden = true;
+    btn.disabled = true; btn.textContent = "Signing in…";     // block double-submit while in flight
     try { await onSubmit(form.email.value.trim(), form.password.value); }
     catch (ex) { err.textContent = "Sign-in failed — check the shared login."; err.hidden = false; }
+    finally { btn.disabled = false; btn.textContent = "Sign in"; }
   });
 }
