@@ -131,6 +131,37 @@ function firstEmoji(s) {
 
 // Emoji picker: a text field that surfaces the device's native emoji keyboard (Gboard
 // etc.) so any emoji works — no static grid. onPick(emoji) on Save; onPick(null) clears.
+// Make an overlay dialog keyboard-accessible: dialog semantics on the sheet, Escape to
+// close, Tab focus trapped inside, and focus returned to whatever opened it on Escape.
+// (Click-outside / Cancel closes are pointer paths and just remove the overlay as before.)
+function trapDialog(overlay, { label } = {}) {
+  const sheet = overlay.firstElementChild || overlay;
+  sheet.setAttribute("role", "dialog");
+  sheet.setAttribute("aria-modal", "true");
+  if (label) sheet.setAttribute("aria-label", label);
+  const opener = document.activeElement;
+  const focusables = () => [...sheet.querySelectorAll(
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  )].filter((n) => n.offsetParent !== null);
+  overlay.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      overlay.remove();
+      if (opener && opener.focus) opener.focus();
+    } else if (e.key === "Tab") {
+      const f = focusables();
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+  // Initial focus for button-only sheets (inputs already self-focus a beat earlier).
+  setTimeout(() => {
+    if (!sheet.contains(document.activeElement)) { const f = focusables(); if (f.length) f[0].focus(); }
+  }, 45);
+}
+
 export function showEmojiPicker(onPick, current = null) {
   const prev = document.querySelector(".emoji-overlay");
   if (prev) prev.remove();
@@ -159,6 +190,7 @@ export function showEmojiPicker(onPick, current = null) {
   overlay.append(form);
   overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.append(overlay);
+  trapDialog(overlay, { label: "Pick an emoji" });
   setTimeout(() => input.focus(), 30);
 }
 
@@ -180,6 +212,7 @@ export function showSheet(title, options) {
     el("button", { type: "button", class: "emoji-clear", text: "Cancel", on: { click: () => overlay.remove() } })));
   overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.append(overlay);
+  trapDialog(overlay, { label: title });
 }
 
 // Styled text-input dialog (replaces native prompt). onSubmit(value) on Save.
@@ -199,6 +232,7 @@ export function showPrompt(title, value, onSubmit, { placeholder = "", hint = ""
   overlay.append(form);
   overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.append(overlay);
+  trapDialog(overlay, { label: title });
   setTimeout(() => { input.focus(); input.select(); }, 30);
 }
 
@@ -216,6 +250,7 @@ export function showConfirm(title, message, onConfirm, { confirmLabel = "Delete"
         on: { click: () => { overlay.remove(); onConfirm(); } } }))));
   overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.append(overlay);
+  trapDialog(overlay, { label: title });
 }
 
 // Inline edit: swap a display element for a text input in place. Commits on
@@ -267,6 +302,7 @@ function showStorePicker(current, onPick) {
     })));
   overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.append(overlay);
+  trapDialog(overlay, { label: "Store" });
 }
 
 // Multi-select store picker for scoping a watch. selected = array of store names;
@@ -304,6 +340,7 @@ function showStoreMultiPicker(selected, onDone) {
         on: { click: () => { overlay.remove(); onDone([...chosen]); } } }))));
   overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.append(overlay);
+  trapDialog(overlay, { label: "Stores to watch" });
 }
 
 // Drag-to-reorder via a per-row handle. Rows are the direct children of `zone`,

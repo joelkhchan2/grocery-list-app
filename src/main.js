@@ -151,6 +151,22 @@ function pushView(view, listId = null) {
   refresh();
 }
 
+// Non-drag reorder fallback for action-sheet menus: given the id being moved, the
+// current ordered id list, and an apply(newIds) callback, returns Move up/down options
+// (omitting the one that isn't possible at an end). Keeps the drag handle and the menu
+// in sync — same reorder path (apply) either way.
+function moveOpts(id, orderedIds, apply) {
+  const idx = orderedIds.indexOf(id);
+  const opts = [];
+  if (idx > 0) opts.push({ label: "⬆ Move up", onClick: () => {
+    const a = orderedIds.slice(); [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; apply(a);
+  } });
+  if (idx >= 0 && idx < orderedIds.length - 1) opts.push({ label: "⬇ Move down", onClick: () => {
+    const a = orderedIds.slice(); [a[idx], a[idx + 1]] = [a[idx + 1], a[idx]]; apply(a);
+  } });
+  return opts;
+}
+
 const handlers = {
   onOpenList: (id) => { storeFilter = null; pushView("detail", id); },
   onSetStoreFilter: (v) => { storeFilter = v; refresh(); },
@@ -255,20 +271,13 @@ const handlers = {
       });
     }
     if (sortMode === "manual") {
-      const active = bySortOrder(lastItems.filter((i) => !i.checked));
-      const idx = active.findIndex((i) => i.id === it.id);
-      const ids = active.map((i) => i.id);
-      if (idx > 0) opts.push({ label: "Move up", onClick: () => {
-        const a = ids.slice(); [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; handlers.onReorder(a);
-      } });
-      if (idx >= 0 && idx < active.length - 1) opts.push({ label: "Move down", onClick: () => {
-        const a = ids.slice(); [a[idx], a[idx + 1]] = [a[idx + 1], a[idx]]; handlers.onReorder(a);
-      } });
+      const ids = bySortOrder(lastItems.filter((i) => !i.checked)).map((i) => i.id);
+      opts.push(...moveOpts(it.id, ids, handlers.onReorder));
     }
     showSheet(it.name, opts);
   },
   onWatchItemMenu: (it) => {
-    showSheet(it.name, [
+    const opts = [
       { label: it.emoji ? `${it.emoji} Change emoji` : "😊 Add emoji",
         onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e), it.emoji) },
       { label: it.watch ? "⏸ Pause alerts" : "▶ Resume alerts", onClick: () => handlers.onToggleWatch(it) },
@@ -301,21 +310,33 @@ const handlers = {
         onClick: () => showPrompt("Exclude words (comma-separated; a deal is skipped if it contains one)",
           it.negative_keywords || "",
           (v) => handlers.onSetExcludeKeywords(it, v), { placeholder: "e.g. hamburger, hot dog, bagel" }) },
-    ]);
+    ];
+    if (sortMode === "manual") {
+      const ids = bySortOrder(lastItems.filter((i) => !i.checked)).map((i) => i.id);
+      opts.push(...moveOpts(it.id, ids, handlers.onReorder));
+    }
+    showSheet(it.name, opts);
   },
   onSetWatchStores: (it, arr) => mutate(() => db.updateItem(client, it.id, { watch_stores: (arr && arr.length) ? arr.join(", ") : null }), [it.id]),
   onSetTargetUnit: (it, unit) => mutate(() => db.updateItem(client, it.id, { target_unit: unit || null }), [it.id]),
   onSetMatchKeywords: (it, v) => mutate(() => db.updateItem(client, it.id, { match_keywords: (v || "").trim() || null }), [it.id]),
   onSetExcludeKeywords: (it, v) => mutate(() => db.updateItem(client, it.id, { negative_keywords: (v || "").trim() || null }), [it.id]),
   onListMenu: (list) => {
-    showSheet(list.name, [
+    const opts = [
       { label: "Rename list", onClick: () => showPrompt("Rename list", list.name, (v) => {
           const t = (v || "").trim();
           if (t && t !== list.name) handlers.onRenameList(list.id, t);
         }) },
       { label: "Duplicate list", onClick: () => handlers.onDuplicateList(list.id) },
       { label: "Save as template", onClick: () => handlers.onSaveTemplate(list.id) },
-    ]);
+    ];
+    // Reorder fallback for lists (drag handle is the primary path). Lists are always
+    // manually ordered, so this isn't gated on sortMode.
+    if (!list.is_template) {
+      const ids = lastLists.filter((l) => !l.is_template).map((l) => l.id);
+      opts.push(...moveOpts(list.id, ids, handlers.onReorderLists));
+    }
+    showSheet(list.name, opts);
   },
   onToggleHaptics: (bool) => {
     haptics = bool;
