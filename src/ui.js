@@ -698,22 +698,6 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
     listEl.append(el("div", { class: "usuals-wrap" },
       el("div", { class: "usuals-label", text: "Your usuals" }), row));
   }
-  // One-time swipe hint (per session, motion-safe): briefly reveal the first row's
-  // delete panel so users discover swipe-to-delete, then snap back.
-  try {
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!reduce && !sessionStorage.getItem("gl-swipe-hinted")) {
-      const firstRow = listEl.querySelector(".row");
-      if (firstRow && firstRow.scrollTo) {
-        sessionStorage.setItem("gl-swipe-hinted", "1");
-        setTimeout(() => {
-          firstRow.scrollTo({ left: 46, behavior: "smooth" });
-          setTimeout(() => firstRow.scrollTo({ left: 0, behavior: "smooth" }), 650);
-        }, 450);
-      }
-    }
-  } catch { /* no sessionStorage / scrollTo */ }
-
   mount.append(listEl);
 
   mount.append(makeAddBar("Add item…", "＋", {
