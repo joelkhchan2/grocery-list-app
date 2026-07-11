@@ -170,7 +170,7 @@ const handlers = {
   onItemMenu: (it) => {
     const opts = [{
       label: it.emoji ? `${it.emoji} Change emoji` : "😊 Add emoji",
-      onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e)),
+      onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e), it.emoji),
     }, {
       label: it.watch ? "Stop watching for deals" : "🔔 Watch for deals",
       onClick: () => handlers.onToggleWatch(it),
@@ -208,7 +208,7 @@ const handlers = {
   onWatchItemMenu: (it) => {
     showSheet(it.name, [
       { label: it.emoji ? `${it.emoji} Change emoji` : "😊 Add emoji",
-        onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e)) },
+        onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e), it.emoji) },
       { label: it.watch ? "⏸ Pause alerts" : "▶ Resume alerts", onClick: () => handlers.onToggleWatch(it) },
       { label: it.target_price != null
           ? `🎯 Deal price: $${Number(it.target_price).toFixed(2)} (edit)`
