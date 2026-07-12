@@ -12,6 +12,22 @@
   <link rel="icon" href="assets/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
   <link rel="stylesheet" href="src/style.css">
+  <!-- Warm the TLS handshakes before the JS needs them (CDN lib + Supabase + fonts). -->
+  <link rel="preconnect" href="https://esm.sh" crossorigin>
+  <link rel="preconnect" href="https://otesgvqcxrzpxsjolwqh.supabase.co">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Fetch the whole module graph in parallel (incl. the big Supabase bundle) instead of
+       discovering imports one waterfall level at a time. -->
+  <link rel="modulepreload" href="https://esm.sh/@supabase/supabase-js@2" crossorigin>
+  <link rel="modulepreload" href="src/main.js">
+  <link rel="modulepreload" href="src/supabase.js">
+  <link rel="modulepreload" href="src/auth.js">
+  <link rel="modulepreload" href="src/db.js">
+  <link rel="modulepreload" href="src/ui.js">
+  <link rel="modulepreload" href="src/theme.js">
+  <link rel="modulepreload" href="src/category.js">
+  <link rel="modulepreload" href="src/model.js">
+  <link rel="modulepreload" href="config.js">
   <script>
     // Pre-paint bootstrap: set theme + per-device customization before the app JS runs
     // to avoid a flash. Mirrors theme.js applyCustom (kept in sync deliberately).
@@ -76,11 +92,12 @@
         });
       }
     }
-    // If the app module never boots (offline / CDN unreachable), replace the silent hang with a message.
+    // If the app module still hasn't booted after a generous window (offline / CDN unreachable),
+    // replace the silent hang with a message. Cached CDN lib means this rarely fires now.
     setTimeout(() => {
       const el = document.querySelector("#app .loading");
       if (el) el.textContent = "Can't reach the server — check your connection and reload.";
-    }, 6000);
+    }, 10000);
   </script>
 </body>
 </html>

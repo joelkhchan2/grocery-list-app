@@ -119,16 +119,25 @@ async function doRender() {
     return;
   }
   if (state.view === "lists") {
-    lastLists = await db.fetchLists(client);
-    const deals = await db.fetchDeals(client).catch(() => []);
+    const [lists, deals] = await Promise.all([
+      db.fetchLists(client),
+      db.fetchDeals(client).catch(() => []),
+    ]);
+    lastLists = lists;
     const dealInfo = { count: deals.length, buyNow: deals.filter((d) => d.buy_now).length };
-    renderLists(app, lastLists.filter(l => !l.is_template), lastLists.filter(l => l.is_template), handlers, dealInfo);
+    renderLists(app, lists.filter(l => !l.is_template), lists.filter(l => l.is_template), handlers, dealInfo);
   } else {
-    lastLists = await db.fetchLists(client);
-    const list = lastLists.find(l => l.id === state.listId);
+    // Fetch lists, this list's items, and usuals in parallel (listId is already known).
+    const [lists, items, usuals] = await Promise.all([
+      db.fetchLists(client),
+      db.fetchItems(client, state.listId),
+      db.topItems(client).catch(() => []),
+    ]);
+    lastLists = lists;
+    const list = lists.find(l => l.id === state.listId);
     if (!list) { state = { view: "lists", listId: null }; return doRender(); }
-    lastItems = await db.fetchItems(client, state.listId);
-    lastUsuals = await db.topItems(client).catch(() => []);
+    lastItems = items;
+    lastUsuals = usuals;
     renderListDetail(app, list, lastItems, handlers, sortMode, lastUsuals, storeFilter);
   }
 }
