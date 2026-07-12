@@ -78,14 +78,52 @@ function markSelfEcho(rows) {
   setTimeout(() => keys.forEach(k => pending.delete(k)), 4000);   // realtime echo arrival window
 }
 
-// Foreground write: run it, then refresh from the server. Use for mutations whose result the
-// UI can't cheaply predict (add, rename, move, reorder, list ops).
+// Retry a write once on a transient/network failure (brief mobile blip, latency spike) — but
+// NOT on real server errors (RLS, constraint, validation), which carry a PostgREST code and
+// should surface immediately. Bails instantly when actually offline. One retry keeps the
+// "response lost after the row was written" duplicate-insert window small.
+async function attempt(fn, tries = 2) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try { return await fn(); }
+    catch (e) {
+      last = e;
+      const online = typeof navigator === "undefined" || navigator.onLine !== false;
+      if (i === tries - 1 || !online) throw last;
+      const msg = String((e && e.message) || "");
+      const code = e && (e.code || e.status);
+      // Expired/invalid auth token — the real cause of intermittent "couldn't save": a mobile PWA
+      // suspends in the background, the token refresh timer doesn't fire, so the first write after
+      // resuming goes out with a stale JWT (401). Refresh the session and retry transparently.
+      if (code === 401 || code === "PGRST301" || /jwt|token|expired|unauthorized/i.test(msg)) {
+        try { await client.auth.refreshSession(); } catch { throw last; }
+        continue;
+      }
+      // Transient network blip (no server code): brief backoff, then retry.
+      if (!code && /fetch|network|load failed|timeout|connection|econn/i.test(msg)) {
+        await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+        continue;
+      }
+      throw last;   // real server error (RLS, constraint, validation) — surface immediately
+    }
+  }
+  throw last;
+}
+
+// Surface a write failure: offline → the standing banner; otherwise a transient toast.
+function reportWriteError() {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) setOffline(true);
+  else setStatus("Couldn't save — check your connection.");
+}
+
+// Foreground write: run it (with retry), then refresh from the server. Use for mutations
+// whose result the UI can't cheaply predict (add, rename, move, reorder, list ops).
 async function mutate(fn) {
   try {
-    markSelfEcho(await fn());
+    markSelfEcho(await attempt(fn));
     await refresh();
   } catch (e) {
-    setStatus("Couldn't save — check your connection.");
+    reportWriteError();
     try { await refresh(); } catch {}                // revert optimistic view to server truth
   }
 }
@@ -94,9 +132,9 @@ async function mutate(fn) {
 // (instant), so on success we do NOT refetch; on failure we refetch to roll back.
 async function mutateBg(fn) {
   try {
-    markSelfEcho(await fn());
+    markSelfEcho(await attempt(fn));
   } catch (e) {
-    setStatus("Couldn't save — check your connection.");
+    reportWriteError();
     try { await refresh(); } catch {}
   }
 }
@@ -438,13 +476,29 @@ function subscribeRealtime() {
     .subscribe();
 }
 
+// Refresh the auth token when the app resumes or reconnects, if it's within ~2 min of expiry,
+// so the first write after the phone was idle doesn't hit a stale JWT. attempt() is the backstop.
+async function ensureFreshSession() {
+  try {
+    const { data } = await client.auth.getSession();
+    const s = data.session;
+    if (s && s.expires_at && s.expires_at * 1000 - Date.now() < 120000) {
+      await client.auth.refreshSession();
+    }
+  } catch { /* ignore — the write-path retry recovers a stale token on the next save */ }
+}
+
 // Bound once, early in boot — so reconnect recovery works even if we first loaded offline
 // (Supabase's own socket auto-reconnects when the network returns; we just re-fetch).
 function bindNetListeners() {
   if (netListenersBound) return;
   netListenersBound = true;
-  window.addEventListener("online", () => { setOffline(false); refresh().catch(() => {}); });
+  window.addEventListener("online", () => { setOffline(false); ensureFreshSession(); refresh().catch(() => {}); });
   window.addEventListener("offline", () => setOffline(true));
+  // Mobile PWAs suspend in the background; refresh the token when the app comes back to the front.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") ensureFreshSession();
+  });
 }
 
 // OS/browser back button: if a sheet/dialog is open, back closes it (staying on the screen);

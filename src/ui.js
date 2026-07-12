@@ -758,12 +758,10 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
   }));
 }
 
-// Leading per-item emoji (tap to change via the native picker). Only rendered when set.
-function emojiLead(item, handlers) {
-  return el("button", {
-    type: "button", class: "item-emoji", text: item.emoji, "aria-label": "Change emoji",
-    on: { click: (e) => { e.stopPropagation(); showEmojiPicker((em) => handlers.onSetItemEmoji(item, em), item.emoji); } },
-  });
+// Leading per-item emoji — display-only (not a button) so it can't be mis-tapped beside the
+// checkbox/name. Change or remove an item's emoji from its ⋯ menu instead.
+function emojiLead(item) {
+  return el("span", { class: "item-emoji", "aria-hidden": "true", text: item.emoji });
 }
 
 // One swipe-to-delete row: .row → .row-main (100% wide) + .row-delete (revealed on left-swipe).
@@ -815,7 +813,7 @@ function buildItemRow(item, handlers, opts = {}) {
     },
   });
   const nameLine = el("div", { class: "name-line" });
-  if (item.emoji) nameLine.append(emojiLead(item, handlers));
+  if (item.emoji) nameLine.append(emojiLead(item));
   nameLine.append(nameSpan);
   const text = el("div", { class: "row-text" }, nameLine);
 
@@ -913,7 +911,7 @@ function buildWatchRow(item, handlers) {
     },
   });
   const wNameLine = el("div", { class: "name-line" });
-  if (item.emoji) wNameLine.append(emojiLead(item, handlers));
+  if (item.emoji) wNameLine.append(emojiLead(item));
   wNameLine.append(wName);
   const text = el("div", { class: "row-text" }, wNameLine);
 

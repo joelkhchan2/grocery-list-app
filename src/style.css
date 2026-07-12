@@ -327,7 +327,6 @@ body {
   border: none;
   font-size: 1.15em;
   line-height: 1;
-  cursor: pointer;
 }
 .note {
   color: var(--sub);
