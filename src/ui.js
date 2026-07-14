@@ -8,7 +8,7 @@ import { MEMBERS } from "../config.js";
 
 // Shown at the bottom of Settings so the loaded version is easy to confirm after a deploy.
 // KEEP IN SYNC with the SHELL constant in sw.js (bump both together on each release).
-export const APP_VERSION = "v44";
+export const APP_VERSION = "v45";
 
 // Tiny element helper. `text` is safe (textContent). Structural strings are author-controlled.
 // `on` is a map of event → handler; `dataset`/`style` are shallow-assigned; any other key is an attribute.
@@ -551,19 +551,6 @@ export function renderLists(mount, lists, templates, handlers, dealInfo = null) 
   }));
 }
 
-// Deal-name link target. On Android, use an intent:// URL so the tap launches the Flipp
-// APP (package com.wishabi.flipp) instead of staying in the browser — Chrome won't hand its
-// own navigations to an app via App Links, but it honors intent:// with an explicit package.
-// Falls back to the web URL if the app isn't installed, and everywhere that isn't Android.
-function flippHref(url) {
-  if (!url) return null;
-  const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent || "");
-  if (!isAndroid) return url;
-  const bare = url.replace(/^https?:\/\//, "");
-  return `intent://${bare}#Intent;scheme=https;package=com.wishabi.flipp;`
-    + `S.browser_fallback_url=${encodeURIComponent(url)};end`;
-}
-
 // ── Deals this week (shared, written by the watcher) ─────────────────────────
 export function renderDeals(mount, deals, handlers) {
   mount.textContent = "";
@@ -601,17 +588,10 @@ export function renderDeals(mount, deals, handlers) {
       const sub = [d.merchant || "?", d.name && d.name !== d.item ? d.name : null].filter(Boolean).join(" · ");
       // Name deep-links into the Flipp flyer (item-level) when the watcher provided a URL;
       // opens the Flipp app on mobile via app-links, else the web viewer. Plain text otherwise.
-      let nameEl;
-      if (d.flipp_url) {
-        const href = flippHref(d.flipp_url);
-        // An intent:// link must open in the SAME tab — target=_blank / a new tab suppresses
-        // the app hand-off, so it'd fall back to the browser. Plain https keeps the new tab.
-        const a = { class: "name deal-link", text: d.item, href };
-        if (!href.startsWith("intent:")) { a.target = "_blank"; a.rel = "noopener noreferrer"; }
-        nameEl = el("a", a);
-      } else {
-        nameEl = el("span", { class: "name", text: d.item });
-      }
+      // Deal name links to the item on flipp.com (opens in the browser / in-app tab).
+      const nameEl = d.flipp_url
+        ? el("a", { class: "name deal-link", text: d.item, href: d.flipp_url, target: "_blank", rel: "noopener noreferrer" })
+        : el("span", { class: "name", text: d.item });
       return el("div", { class: hero ? "deal-row hero" : "deal-row" },
         el("div", { class: "deal-head" },
           el("div", { class: "row-text" },
