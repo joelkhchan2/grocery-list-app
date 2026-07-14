@@ -782,6 +782,7 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
+.app-version { text-align: center; color: var(--sub); font-size: var(--fs-sub); margin: var(--space-4) 0 var(--space-3); }
 
 /* ── Focus visibility (keyboard) ─────────────────────────────────────── */
 :focus-visible {

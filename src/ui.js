@@ -6,6 +6,10 @@ import { THEMES, FONTS, FONT_SIZES } from "./theme.js";
 import { categoryOf, CATEGORY_ORDER } from "./category.js";
 import { MEMBERS } from "../config.js";
 
+// Shown at the bottom of Settings so the loaded version is easy to confirm after a deploy.
+// KEEP IN SYNC with the SHELL constant in sw.js (bump both together on each release).
+export const APP_VERSION = "v44";
+
 // Tiny element helper. `text` is safe (textContent). Structural strings are author-controlled.
 // `on` is a map of event → handler; `dataset`/`style` are shallow-assigned; any other key is an attribute.
 function el(tag, opts = {}, ...kids) {
@@ -597,9 +601,17 @@ export function renderDeals(mount, deals, handlers) {
       const sub = [d.merchant || "?", d.name && d.name !== d.item ? d.name : null].filter(Boolean).join(" · ");
       // Name deep-links into the Flipp flyer (item-level) when the watcher provided a URL;
       // opens the Flipp app on mobile via app-links, else the web viewer. Plain text otherwise.
-      const nameEl = d.flipp_url
-        ? el("a", { class: "name deal-link", text: d.item, href: flippHref(d.flipp_url), target: "_blank", rel: "noopener noreferrer" })
-        : el("span", { class: "name", text: d.item });
+      let nameEl;
+      if (d.flipp_url) {
+        const href = flippHref(d.flipp_url);
+        // An intent:// link must open in the SAME tab — target=_blank / a new tab suppresses
+        // the app hand-off, so it'd fall back to the browser. Plain https keeps the new tab.
+        const a = { class: "name deal-link", text: d.item, href };
+        if (!href.startsWith("intent:")) { a.target = "_blank"; a.rel = "noopener noreferrer"; }
+        nameEl = el("a", a);
+      } else {
+        nameEl = el("span", { class: "name", text: d.item });
+      }
       return el("div", { class: hero ? "deal-row hero" : "deal-row" },
         el("div", { class: "deal-head" },
           el("div", { class: "row-text" },
@@ -1149,6 +1161,8 @@ export function renderAppearance(mount, prefs, handlers) {
     type: "button", class: "signout", text: "Sign out",
     on: { click: () => handlers.onSignOut() },
   }));
+
+  settings.append(el("p", { class: "app-version", text: `Version ${APP_VERSION}` }));
 
   mount.append(settings);
 }
