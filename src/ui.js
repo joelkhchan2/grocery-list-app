@@ -582,10 +582,15 @@ export function renderDeals(mount, deals, handlers) {
       if (d.valid_to) meta.push(`until ${d.valid_to}`);
       // Sub-line: which store, and the flyer's product name when it differs from the watch item.
       const sub = [d.merchant || "?", d.name && d.name !== d.item ? d.name : null].filter(Boolean).join(" · ");
+      // Name deep-links into the Flipp flyer (item-level) when the watcher provided a URL;
+      // opens the Flipp app on mobile via app-links, else the web viewer. Plain text otherwise.
+      const nameEl = d.flipp_url
+        ? el("a", { class: "name deal-link", text: d.item, href: d.flipp_url, target: "_blank", rel: "noopener noreferrer" })
+        : el("span", { class: "name", text: d.item });
       return el("div", { class: hero ? "deal-row hero" : "deal-row" },
         el("div", { class: "deal-head" },
           el("div", { class: "row-text" },
-            el("span", { class: "name", text: d.item }),
+            nameEl,
             sub ? el("span", { class: "deal-sub", text: sub }) : null),
           el("span", { class: "deal-price", text: `${fmt(d.price)}${suf(d)}` })),
         meta.length ? el("div", { class: "deal-meta", text: meta.join(" · ") }) : null);

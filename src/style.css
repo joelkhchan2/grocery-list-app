@@ -1092,6 +1092,8 @@ body {
 .deal-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
 .deal-head .row-text { min-width: 0; }        /* let the name ellipsize instead of shoving the price off */
 .deal-head .name { font-weight: 600; }
+/* Deal name links into the Flipp flyer — accent color + subtle underline to read as tappable. */
+.deal-link { color: var(--ac); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
 .deal-sub { display: block; color: var(--sub); font-size: var(--fs-sub); margin-top: 2px; }
 .deal-price { flex: none; font-weight: 700; font-size: 1.15em; white-space: nowrap; }
 .deal-row.hero .deal-price { color: var(--ac); }
