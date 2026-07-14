@@ -547,6 +547,19 @@ export function renderLists(mount, lists, templates, handlers, dealInfo = null) 
   }));
 }
 
+// Deal-name link target. On Android, use an intent:// URL so the tap launches the Flipp
+// APP (package com.wishabi.flipp) instead of staying in the browser — Chrome won't hand its
+// own navigations to an app via App Links, but it honors intent:// with an explicit package.
+// Falls back to the web URL if the app isn't installed, and everywhere that isn't Android.
+function flippHref(url) {
+  if (!url) return null;
+  const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent || "");
+  if (!isAndroid) return url;
+  const bare = url.replace(/^https?:\/\//, "");
+  return `intent://${bare}#Intent;scheme=https;package=com.wishabi.flipp;`
+    + `S.browser_fallback_url=${encodeURIComponent(url)};end`;
+}
+
 // ── Deals this week (shared, written by the watcher) ─────────────────────────
 export function renderDeals(mount, deals, handlers) {
   mount.textContent = "";
@@ -585,7 +598,7 @@ export function renderDeals(mount, deals, handlers) {
       // Name deep-links into the Flipp flyer (item-level) when the watcher provided a URL;
       // opens the Flipp app on mobile via app-links, else the web viewer. Plain text otherwise.
       const nameEl = d.flipp_url
-        ? el("a", { class: "name deal-link", text: d.item, href: d.flipp_url, target: "_blank", rel: "noopener noreferrer" })
+        ? el("a", { class: "name deal-link", text: d.item, href: flippHref(d.flipp_url), target: "_blank", rel: "noopener noreferrer" })
         : el("span", { class: "name", text: d.item });
       return el("div", { class: hero ? "deal-row hero" : "deal-row" },
         el("div", { class: "deal-head" },
