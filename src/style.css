@@ -344,6 +344,29 @@ body {
 /* Whole-card tap affordance (lists home rows) */
 .row-main.tappable { cursor: pointer; }
 
+/* Clean item rows: muted quantity/unit after the name; the content taps into the editor. */
+.name-line .qty { flex: none; color: var(--sub); font-size: var(--fs-sub); }
+.row-text.tappable { cursor: pointer; }
+
+/* Item editor sheet (opens on tapping a row) */
+.editor-sheet { gap: var(--space-3); overflow-y: auto; }
+.editor-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-1); }
+.editor-cancel { background: none; border: none; color: var(--sub); font: inherit; font-size: 1rem; cursor: pointer; padding: var(--space-2); }
+.editor-save { background: none; border: none; color: var(--ac); font: inherit; font-size: 1rem; font-weight: 700; cursor: pointer; padding: var(--space-2); }
+.editor-namerow { display: flex; gap: var(--space-2); align-items: center; }
+.editor-name { flex: 1; font-size: 1.1rem; font-weight: 600; }
+.editor-qtyrow { display: flex; gap: var(--space-2); align-items: flex-end; }
+.editor-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.editor-field[hidden] { display: none; }   /* the class display:flex would otherwise override [hidden] */
+.editor-field.grow { flex: 1; }
+.editor-label { color: var(--sub); font-size: var(--fs-sub); }
+.editor-input { width: 100%; min-height: 44px; padding: 0 var(--space-3); border: 1px solid var(--border); border-radius: var(--r-ctl); background: var(--card); color: var(--tx); font: inherit; }
+.editor-input[hidden] { display: none; }
+.editor-unit-custom { margin-top: 4px; }
+.editor-steppers { display: flex; gap: var(--space-2); flex: none; }
+.editor-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.editor-action { display: block; width: 100%; text-align: left; min-height: 48px; padding: 0 var(--space-2); background: none; border: none; color: var(--ac); font: inherit; font-weight: 600; cursor: pointer; }
+
 /* ── Checkbox (.box / .box.on) ───────────────────────────────────────── */
 .box {
   position: relative;

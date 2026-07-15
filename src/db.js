@@ -137,7 +137,7 @@ async function copyList(client, listId, { isTemplate = false, suffix = "" }) {
   const items = (await run(client.from("items").select("*").eq("list_id", listId))) || [];
   if (items.length) {
     await run(client.from("items").insert(items.map((it) => ({
-      list_id: newList.id, name: it.name, amount: it.amount, note: it.note, store: it.store,
+      list_id: newList.id, name: it.name, amount: it.amount, unit: it.unit, note: it.note, store: it.store,
       watch: it.watch, emoji: it.emoji, sort_order: it.sort_order, checked: false,
       target_price: it.target_price, target_unit: it.target_unit, match_keywords: it.match_keywords,
       negative_keywords: it.negative_keywords, watch_stores: it.watch_stores,   // carry watch tuning

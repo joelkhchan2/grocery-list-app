@@ -1,14 +1,14 @@
 // ui.js — pure DOM render + event wiring. No Supabase here; all effects go through `handlers`.
 // All user-provided text (list/item names, notes, amounts) is set via textContent / DOM APIs only —
 // never interpolated into innerHTML.
-import { bySortOrder, isNumericAmount, stepAmount } from "./model.js";
+import { bySortOrder, stepAmount } from "./model.js";
 import { THEMES, FONTS, FONT_SIZES } from "./theme.js";
 import { categoryOf, CATEGORY_ORDER } from "./category.js";
 import { MEMBERS } from "../config.js";
 
 // Shown at the bottom of Settings so the loaded version is easy to confirm after a deploy.
 // KEEP IN SYNC with the SHELL constant in sw.js (bump both together on each release).
-export const APP_VERSION = "v45";
+export const APP_VERSION = "v47";
 
 // Tiny element helper. `text` is safe (textContent). Structural strings are author-controlled.
 // `on` is a map of event → handler; `dataset`/`style` are shallow-assigned; any other key is an attribute.
@@ -64,15 +64,6 @@ export function getMyStores() { return MY_STORES.slice(); }
 const OTHER_STORES = ["Costco", "T&T", "Loblaws", "Metro", "Sobeys", "Longo's", "Farm Boy",
   "Fortinos", "Shoppers Drug Mart", "Adonis", "Btrust", "Bulk Barn", "Dollarama", "Whole Foods"];
 
-// Tappable store chip → opens the styled store picker. Empty = no store set.
-function buildStoreChip(item, handlers) {
-  return el("button", {
-    type: "button", class: item.store ? "store-chip set" : "store-chip",
-    "aria-label": item.store ? `Store: ${item.store}` : "Set store",
-    text: item.store ? `🛒 ${item.store}` : "🛒 Store",
-    on: { click: () => showStorePicker(item.store || null, (s) => handlers.onSetStore(item, s)) },
-  });
-}
 
 // Append collapsible <details> sections for pre-built groups to a container.
 function appendGroups(listEl, groups, handlers) {
@@ -801,86 +792,136 @@ function buildItemRow(item, handlers, opts = {}) {
 
   const main = el("div", { class: "row-main" });
 
-  // Decorative drag handle (Manual sort). aria-hidden — the accessible reorder path
-  // is Move up / Move down in the ⋯ menu.
-  if (opts.drag) main.append(el("span", { class: "drag-handle", "aria-hidden": "true" }, icon("drag", 20)));
-
-  // Checkbox — checked ✓ is drawn solely by CSS `.box.on::after`.
+  // Checkbox (left). checked ✓ is drawn solely by CSS `.box.on::after`.
   main.append(el("button", {
     type: "button", class: "box", "aria-label": "Check off", "aria-pressed": "false",
-    on: { click: () => handlers.onToggleCheck(item) },
+    on: { click: (e) => { e.stopPropagation(); handlers.onToggleCheck(item); } },
   }));
 
-  // Name gets its own line so it stays readable; the amount control + meta chips sit on
-  // line 2, and the note (if any) on line 3. The ⋯ menu is the only right-column control.
-  const nameSpan = el("span", {
-    class: "name", text: item.name,
-    on: {
-      click: (e) => inlineEdit(e.currentTarget, item.name, (v) => {
-        const t = (v || "").trim();
-        if (t && t !== item.name) handlers.onEditItem(item, t);
-      }),
-    },
-  });
+  // Clean content: leading emoji + name + a muted quantity/unit; note as a sub-line only
+  // when set. Tapping this area opens the full item editor (all other fields live there).
   const nameLine = el("div", { class: "name-line" });
   if (item.emoji) nameLine.append(emojiLead(item));
-  nameLine.append(nameSpan);
-  const text = el("div", { class: "row-text" }, nameLine);
-
-  // Amount control — numeric gets a −/value/+ stepper (value tappable for free text);
-  // a non-numeric amount is tap-to-edit text. Lives on line 2, right-aligned.
-  let amountCtl;
-  if (isNumericAmount(item.amount)) {
-    amountCtl = el("div", { class: "stepper" },
-      el("button", { type: "button", class: "step", "aria-label": "Fewer", text: "−",
-        on: { click: () => handlers.onAmount(item, stepAmount(item.amount, -1)) } }),
-      el("span", { class: "amount editable", text: String(item.amount).trim(), "aria-label": "Edit amount",
-        on: { click: (e) => inlineEdit(e.currentTarget, item.amount, (v) => { const t = v.trim(); if (t && t !== String(item.amount).trim()) handlers.onEditAmount(item, t); }, { placeholder: "e.g. 500 g" }) } }),
-      el("button", { type: "button", class: "step", "aria-label": "More", text: "+",
-        on: { click: () => handlers.onAmount(item, stepAmount(item.amount, +1)) } }));
-  } else {
-    amountCtl = el("span", { class: "amount editable", text: item.amount || "", "aria-label": "Edit amount",
-      on: { click: (e) => inlineEdit(e.currentTarget, item.amount, (v) => { const t = v.trim(); if (t && t !== String(item.amount || "").trim()) handlers.onEditAmount(item, t); }, { placeholder: "e.g. 500 g" }) } });
+  nameLine.append(el("span", { class: "name", text: item.name }));
+  const amt = item.amount == null ? "" : String(item.amount).trim();
+  if (amt && (amt !== "1" || item.unit)) {
+    nameLine.append(el("span", { class: "qty", text: [amt, item.unit].filter(Boolean).join(" ") }));
   }
-
-  // Line 2: who · flags kept clustered (badge never orphans), then the store chip. The
-  // chip is a sibling of the cluster in the wrapping meta-line, so on a crowded row
-  // (who + watch + target + store) it wraps to its own line and stays readable rather
-  // than shrinking to an unreadable icon.
-  const primary = el("div", { class: "meta-primary" });
-  const who = item.created_by && MEMBERS[item.created_by];
-  if (who) {
-    primary.append(el("span", {
-      class: "who", "aria-label": `Added by ${who.initial}`, title: `Added by ${who.initial}`,
-      text: who.initial, style: { background: who.color },
-    }));
-  }
-  if (item.watch) primary.append(el("span", { class: "watch-flag" }, icon("bell", 14), document.createTextNode(" watch")));
-  if (item.target_price != null) {
-    primary.append(el("span", { class: "target-flag",
-      text: `🎯 ≤ $${Number(item.target_price).toFixed(2)}`,
-      title: "Deal-price alert target" }));
-  }
-  text.append(el("div", { class: "meta-line" }, primary, buildStoreChip(item, handlers)));   // line 2
-
-  // Line 3: note (left, truncates if long) + amount control (right).
-  const noteEl = item.note
-    ? el("span", { class: "note", text: item.note,
-        on: { click: (e) => inlineEdit(e.currentTarget, item.note, (v) => handlers.onEditNote(item, v.trim() || null)) } })
-    : el("button", { type: "button", class: "add-note", text: "+ note",
-        on: { click: (e) => inlineEdit(e.currentTarget, "", (v) => { const t = v.trim(); if (t) handlers.onEditNote(item, t); }, { placeholder: "note" }) } });
-  text.append(el("div", { class: "row-line2" }, noteEl, amountCtl));
+  const text = el("div", { class: "row-text tappable",
+    on: { click: () => handlers.onOpenItem(item) } }, nameLine);
+  if (item.note) text.append(el("span", { class: "note", text: item.note }));
   main.append(text);
 
-  // Overflow menu (watch toggle · target price · move to list · reorder). Keeps the row uncluttered.
-  main.append(el("button", {
-    type: "button", class: "icon-btn", "aria-label": "Item actions",
-    on: { click: () => handlers.onItemMenu(item) },
-  }, icon("more")));
+  // Drag handle (right) — Manual sort. aria-hidden; the accessible reorder path is
+  // Move up / Move down inside the item editor sheet.
+  if (opts.drag) main.append(el("span", { class: "drag-handle", "aria-hidden": "true" }, icon("drag", 20)));
 
   return el("div", {
     class: "row", dataset: { name: String(item.name || "").toLowerCase(), id: item.id },
   }, main, del);
+}
+
+// Full item editor (opens on tapping a row). Consolidates every field that used to clutter
+// the row + the old ⋯ menu: name/emoji, quantity + unit (with steppers), note, store,
+// watch-for-deals + deal price, move-to-list, delete. Cancel/Save header; all fields commit
+// together via handlers.onSaveItem(item, patch). ctx (from main.js) supplies the move-to-list
+// context the editor can't know: { moveTargets:[{id,label}], onMove }. Reorder is drag-only.
+export function showItemEditor(item, handlers, ctx = {}) {
+  const prev = document.querySelector(".emoji-overlay");
+  if (prev) prev.remove();
+  const overlay = el("div", { class: "emoji-overlay" });
+  const s = {
+    emoji: item.emoji || null,
+    store: item.store || null,
+    watch: !!item.watch,
+  };
+
+  const nameInput = el("input", { type: "text", class: "prompt-input editor-name", value: item.name || "", "aria-label": "Item name" });
+  const emojiBtn = el("button", {
+    type: "button", class: s.emoji ? "emoji-btn" : "emoji-btn placeholder", text: s.emoji || "＋", "aria-label": "Change emoji",
+    on: { click: () => showEmojiPicker((em) => { s.emoji = em || null; emojiBtn.textContent = s.emoji || "＋"; emojiBtn.className = s.emoji ? "emoji-btn" : "emoji-btn placeholder"; }, s.emoji) },
+  });
+
+  const qtyInput = el("input", { type: "text", inputmode: "numeric", class: "editor-input editor-qty", value: (item.amount != null ? String(item.amount) : ""), placeholder: "1", "aria-label": "Quantity" });
+  // Unit: dropdown of common grocery measurements + a "Custom…" option that reveals a text field.
+  const UNITS = ["g", "kg", "ml", "L", "oz", "lb", "pack", "bag", "box", "can", "bottle", "jar", "bunch", "dozen", "each"];
+  const curUnit = (item.unit || "").trim();
+  const isCustom = !!curUnit && !UNITS.includes(curUnit);
+  const unitSelect = el("select", { class: "editor-input editor-unit", "aria-label": "Unit" },
+    el("option", { value: "", text: "—" }),
+    ...UNITS.map((u) => el("option", { value: u, text: u })),
+    el("option", { value: "__custom__", text: "Custom…" }));
+  unitSelect.value = curUnit ? (isCustom ? "__custom__" : curUnit) : "";
+  const unitCustom = el("input", { type: "text", class: "editor-input editor-unit-custom", value: isCustom ? curUnit : "", placeholder: "Custom unit", "aria-label": "Custom unit" });
+  unitCustom.hidden = !isCustom;
+  unitSelect.addEventListener("change", () => {
+    const custom = unitSelect.value === "__custom__";
+    unitCustom.hidden = !custom;
+    if (custom) setTimeout(() => unitCustom.focus(), 0);
+  });
+  const dec = el("button", { type: "button", class: "step", text: "−", "aria-label": "Fewer", on: { click: () => { qtyInput.value = stepAmount(qtyInput.value.trim() || "1", -1); } } });
+  const inc = el("button", { type: "button", class: "step", text: "+", "aria-label": "More", on: { click: () => { qtyInput.value = stepAmount(qtyInput.value.trim() || "0", +1); } } });
+
+  const noteInput = el("input", { type: "text", class: "prompt-input", value: item.note || "", placeholder: "Note e.g. expiration date", "aria-label": "Note" });
+
+  const storeBtn = el("button", {
+    type: "button", class: s.store ? "store-chip set" : "store-chip", text: s.store ? `🛒 ${s.store}` : "🛒 Store", "aria-label": "Store",
+    on: { click: () => showStorePicker(s.store, (v) => { s.store = v; storeBtn.textContent = v ? `🛒 ${v}` : "🛒 Store"; storeBtn.className = v ? "store-chip set" : "store-chip"; }) },
+  });
+
+  const priceInput = el("input", { type: "text", inputmode: "decimal", class: "prompt-input", value: (item.target_price != null ? String(item.target_price) : ""), placeholder: "e.g. 4.00", "aria-label": "Deal price" });
+  const priceRow = el("div", { class: "editor-field" }, el("span", { class: "editor-label", text: "Alert me at or under ($)" }), priceInput);
+  priceRow.hidden = !s.watch;
+  const watchToggle = el("button", {
+    type: "button", role: "switch", class: s.watch ? "toggle on" : "toggle", "aria-checked": String(s.watch), "aria-label": "Watch for deals",
+    on: { click: () => { s.watch = !s.watch; watchToggle.className = s.watch ? "toggle on" : "toggle"; watchToggle.setAttribute("aria-checked", String(s.watch)); priceRow.hidden = !s.watch; } },
+  });
+
+  const save = () => {
+    const tp = priceInput.value.trim().replace(/[^0-9.]/g, "");
+    const patch = {
+      name: nameInput.value.trim() || item.name,
+      emoji: s.emoji,
+      amount: qtyInput.value.trim() || "1",
+      unit: (unitSelect.value === "__custom__" ? unitCustom.value.trim() : unitSelect.value) || null,
+      note: noteInput.value.trim() || null,
+      store: s.store || null,
+      watch: s.watch,
+      target_price: s.watch && tp && isFinite(parseFloat(tp)) ? parseFloat(tp) : null,
+    };
+    overlay.remove();
+    handlers.onSaveItem(item, patch);
+  };
+
+  const rows = [
+    el("div", { class: "editor-header" },
+      el("button", { type: "button", class: "editor-cancel", text: "Cancel", on: { click: () => overlay.remove() } }),
+      el("button", { type: "button", class: "editor-save", text: "Save", on: { click: save } })),
+    el("div", { class: "editor-namerow" }, nameInput, emojiBtn),
+    el("div", { class: "editor-qtyrow" },
+      el("div", { class: "editor-field grow" }, el("span", { class: "editor-label", text: "Quantity" }), qtyInput),
+      el("div", { class: "editor-field grow" }, el("span", { class: "editor-label", text: "Unit" }), unitSelect),
+      el("div", { class: "editor-steppers" }, dec, inc)),
+    unitCustom,
+    noteInput,
+    el("div", { class: "editor-row" }, el("span", { class: "editor-label", text: "Store" }), storeBtn),
+    el("div", { class: "editor-row" }, el("span", { class: "editor-label", text: "🔔 Watch for deals" }), watchToggle),
+    priceRow,
+  ];
+
+  // Move to another list (if any target lists) — opens a sub-sheet.
+  if (ctx.moveTargets && ctx.moveTargets.length && ctx.onMove) {
+    rows.push(el("button", { type: "button", class: "editor-action", text: "Move to another list…",
+      on: { click: () => { overlay.remove(); showSheet(`Move "${item.name}" to…`, ctx.moveTargets.map((t) => ({ label: t.label, onClick: () => ctx.onMove(t.id) }))); } } }));
+  }
+  rows.push(el("button", { type: "button", class: "signout", text: "Delete item",
+    on: { click: () => { overlay.remove(); handlers.onDeleteItem(item); } } }));
+
+  overlay.append(el("div", { class: "emoji-sheet editor-sheet" }, ...rows));
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.append(overlay);
+  trapDialog(overlay, { label: "Edit item" });
+  setTimeout(() => nameInput.focus(), 30);
 }
 
 function splitStores(csv) {

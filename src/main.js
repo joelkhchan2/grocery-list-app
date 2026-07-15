@@ -1,7 +1,7 @@
 import { getClient } from "./supabase.js";
 import { currentSession, signIn, signOut, renderSignIn } from "./auth.js";
 import * as db from "./db.js";
-import { renderLists, renderListDetail, renderDeals, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, showEmojiPicker, setMyStores } from "./ui.js";
+import { renderLists, renderListDetail, renderDeals, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, showEmojiPicker, showItemEditor, setMyStores } from "./ui.js";
 import { loadPrefs, savePrefs, applyTheme, applyCustom, resolveActive } from "./theme.js";
 import { isSelfEcho, selfEchoKey, bySortOrder } from "./model.js";
 import { emojiOf } from "./category.js";
@@ -290,6 +290,17 @@ const handlers = {
     try { localStorage.setItem("glSort", mode); } catch { /* private mode */ }
     refresh();
   },
+  // Tap a row → open the full editor. main.js supplies the move-to-list targets the editor
+  // can't know; reorder is drag-only (no keyboard fallback needed here).
+  onOpenItem: (it) => {
+    showItemEditor(it, handlers, {
+      moveTargets: lastLists.filter((l) => l.id !== state.listId && !l.is_template)
+        .map((l) => ({ id: l.id, label: (l.emoji ? l.emoji + " " : "") + l.name })),
+      onMove: (listId) => handlers.onMoveItem(it, listId),
+    });
+  },
+  // Editor commits every field at once (name, emoji, amount, unit, note, store, watch, target).
+  onSaveItem: (it, patch) => mutate(() => db.updateItem(client, it.id, patch), [it.id]),
   onDeleteItem: (it) => {
     mutate(() => db.deleteItem(client, it.id), [it.id]);
     // reinsertItem (not addItem) preserves watch/checked/sort_order so an undone watch still feeds the watcher.
