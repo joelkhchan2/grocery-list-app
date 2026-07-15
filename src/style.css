@@ -1374,7 +1374,8 @@ details[open] > .store-summary::before { content: "▾"; }
   color: var(--sub);
   border: 1px dashed var(--border);
 }
-.emoji-overlay {
+.emoji-overlay,
+.editor-overlay {
   position: fixed;
   inset: 0;
   z-index: 80;
@@ -1383,6 +1384,8 @@ details[open] > .store-summary::before { content: "▾"; }
   justify-content: center;
   background: rgb(0 0 0 / 0.35);
 }
+/* Sub-pickers (store/emoji) opened from the editor sit above it. */
+.emoji-overlay { z-index: 90; }
 .emoji-sheet {
   width: 100%;
   max-width: 480px;

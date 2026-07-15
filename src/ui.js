@@ -8,7 +8,7 @@ import { MEMBERS } from "../config.js";
 
 // Shown at the bottom of Settings so the loaded version is easy to confirm after a deploy.
 // KEEP IN SYNC with the SHELL constant in sw.js (bump both together on each release).
-export const APP_VERSION = "v49";
+export const APP_VERSION = "v50";
 
 // Tiny element helper. `text` is safe (textContent). Structural strings are author-controlled.
 // `on` is a map of event → handler; `dataset`/`style` are shallow-assigned; any other key is an attribute.
@@ -814,9 +814,10 @@ function buildItemRow(item, handlers, opts = {}) {
 // together via handlers.onSaveItem(item, patch). ctx (from main.js) supplies the move-to-list
 // context the editor can't know: { moveTargets:[{id,label}], onMove }. Reorder is drag-only.
 export function showItemEditor(item, handlers, ctx = {}) {
-  const prev = document.querySelector(".emoji-overlay");
-  if (prev) prev.remove();
-  const overlay = el("div", { class: "emoji-overlay" });
+  document.querySelectorAll(".emoji-overlay, .editor-overlay").forEach((o) => o.remove());
+  // Distinct overlay class (not .emoji-overlay) so the emoji/store sub-pickers — which remove
+  // any open .emoji-overlay — stack ON TOP of the editor instead of destroying it.
+  const overlay = el("div", { class: "editor-overlay" });
   const s = {
     emoji: item.emoji || null,
     store: item.store || null,
