@@ -347,6 +347,8 @@ body {
 /* Clean item rows: muted quantity/unit after the name; the content taps into the editor. */
 .name-line .qty { flex: none; color: var(--sub); font-size: var(--fs-sub); }
 .row-text.tappable { cursor: pointer; }
+/* Store sub-line — shown only when a store is set in the item details. */
+.row-store { color: var(--sub); font-size: var(--fs-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Item editor sheet (opens on tapping a row) */
 .editor-sheet { gap: var(--space-3); overflow-y: auto; }

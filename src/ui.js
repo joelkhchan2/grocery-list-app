@@ -8,7 +8,7 @@ import { MEMBERS } from "../config.js";
 
 // Shown at the bottom of Settings so the loaded version is easy to confirm after a deploy.
 // KEEP IN SYNC with the SHELL constant in sw.js (bump both together on each release).
-export const APP_VERSION = "v47";
+export const APP_VERSION = "v48";
 
 // Tiny element helper. `text` is safe (textContent). Structural strings are author-controlled.
 // `on` is a map of event → handler; `dataset`/`style` are shallow-assigned; any other key is an attribute.
@@ -809,6 +809,7 @@ function buildItemRow(item, handlers, opts = {}) {
   }
   const text = el("div", { class: "row-text tappable",
     on: { click: () => handlers.onOpenItem(item) } }, nameLine);
+  if (item.store) text.append(el("span", { class: "row-store", text: `🛒 ${item.store}` }));
   if (item.note) text.append(el("span", { class: "note", text: item.note }));
   main.append(text);
 
