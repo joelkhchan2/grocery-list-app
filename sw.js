@@ -1,4 +1,4 @@
-const SHELL = "shell-v48";
+const SHELL = "shell-v49";
 // App-shell cache (same-origin) is NETWORK-FIRST: always try the latest, fall back to cache
 // offline. RUNTIME is a long-lived CACHE-FIRST store for static CDN libs (esm.sh) + web fonts,
 // so the app boots even when esm.sh is slow/unreachable and repeat loads skip the network for

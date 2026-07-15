@@ -8,7 +8,7 @@ import { MEMBERS } from "../config.js";
 
 // Shown at the bottom of Settings so the loaded version is easy to confirm after a deploy.
 // KEEP IN SYNC with the SHELL constant in sw.js (bump both together on each release).
-export const APP_VERSION = "v48";
+export const APP_VERSION = "v49";
 
 // Tiny element helper. `text` is safe (textContent). Structural strings are author-controlled.
 // `on` is a map of event → handler; `dataset`/`style` are shallow-assigned; any other key is an attribute.
@@ -736,20 +736,6 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
         body));
     }
   }
-  // "Your usuals" — quick-add chips from history, excluding items already on this list.
-  const present = new Set(items.map((i) => String(i.name).toLowerCase()));
-  const chips = (usuals || []).filter((u) => !present.has(String(u.name).toLowerCase())).slice(0, 10);
-  if (chips.length) {
-    const row = el("div", { class: "usuals" });
-    for (const u of chips) {
-      row.append(el("button", {
-        type: "button", class: "usual-chip", text: `＋ ${u.name}`,
-        on: { click: () => handlers.onPickSuggestion(u) },
-      }));
-    }
-    listEl.append(el("div", { class: "usuals-wrap" },
-      el("div", { class: "usuals-label", text: "Your usuals" }), row));
-  }
   mount.append(listEl);
 
   mount.append(makeAddBar("Add item…", "＋", {
@@ -921,8 +907,9 @@ export function showItemEditor(item, handlers, ctx = {}) {
   overlay.append(el("div", { class: "emoji-sheet editor-sheet" }, ...rows));
   overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.append(overlay);
+  // Don't auto-focus the name — that pops the keyboard on open. trapDialog focuses the
+  // Cancel button instead (dialog a11y) without raising the keyboard.
   trapDialog(overlay, { label: "Edit item" });
-  setTimeout(() => nameInput.focus(), 30);
 }
 
 function splitStores(csv) {
