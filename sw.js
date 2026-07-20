@@ -1,4 +1,4 @@
-const SHELL = "shell-v51";
+const SHELL = "shell-v52";
 // App-shell cache (same-origin) is NETWORK-FIRST: always try the latest, fall back to cache
 // offline. RUNTIME is a long-lived CACHE-FIRST store for static CDN libs (esm.sh) + web fonts,
 // so the app boots even when esm.sh is slow/unreachable and repeat loads skip the network for
@@ -26,16 +26,22 @@ function isCdn(url) {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
 
-  // Same-origin app shell: network-first, refresh cache, fall back to cache offline.
+  // Same-origin app shell: network-first with a SHORT TIMEOUT. On a slow/flaky (away-from-home)
+  // network a plain fetch hangs and the app stalls until the browser gives up; instead, if we have
+  // a cached copy, serve it after ~2.5s and let the network keep updating the cache in the
+  // background. Fresh when the network is fast, cache when it isn't, real network when uncached.
   if (url.origin === location.origin) {
-    e.respondWith(
-      fetch(e.request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(SHELL).then((c) => c.put(e.request, copy)).catch(() => {});
-          return res;
-        })
-        .catch(() => caches.match(e.request)));
+    e.respondWith((async () => {
+      const cached = await caches.match(e.request);
+      const net = fetch(e.request).then((res) => {
+        const copy = res.clone();
+        caches.open(SHELL).then((c) => c.put(e.request, copy)).catch(() => {});
+        return res;
+      });
+      if (!cached) return net.catch(() => caches.match(e.request));   // nothing cached → wait for network
+      const fallback = new Promise((resolve) => setTimeout(() => resolve(cached), 2500));
+      return Promise.race([net.catch(() => cached), fallback]);
+    })());
     return;
   }
 

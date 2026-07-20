@@ -8,7 +8,7 @@ import { MEMBERS } from "../config.js";
 
 // Shown at the bottom of Settings so the loaded version is easy to confirm after a deploy.
 // KEEP IN SYNC with the SHELL constant in sw.js (bump both together on each release).
-export const APP_VERSION = "v51";
+export const APP_VERSION = "v52";
 
 // Tiny element helper. `text` is safe (textContent). Structural strings are author-controlled.
 // `on` is a map of event → handler; `dataset`/`style` are shallow-assigned; any other key is an attribute.

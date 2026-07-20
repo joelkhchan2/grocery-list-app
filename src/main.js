@@ -527,14 +527,20 @@ window.addEventListener("popstate", (e) => {
   refresh();
 });
 
+// Reject (instead of hanging forever) if a load-time network call stalls, so boot()'s catch can
+// retry. A hung fetch never throws on its own — that's the away-from-home trap a plain try/catch misses.
+function withTimeout(promise, ms) {
+  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error("timed out")), ms))]);
+}
+
 async function boot(attempt = 0) {
   bindNetListeners();
   if (offline) setOffline(true);          // surface the standing banner if we booted offline
   try {
     // getSession + the first fetch can hang/fail on a flaky or away-from-home network at load.
-    const session = await currentSession(client);
+    const session = await withTimeout(currentSession(client), 8000);
     if (!session) { renderSignIn(app, async (email, pw) => { await signIn(client, email, pw); boot(); }); return; }
-    await refresh();
+    await withTimeout(refresh(), 12000);
     navState = { view: "lists", listId: null };
     try { history.replaceState({ gl: navState }, ""); } catch { /* ignore */ }
     subscribeRealtime();
