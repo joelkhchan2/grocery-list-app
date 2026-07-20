@@ -527,14 +527,24 @@ window.addEventListener("popstate", (e) => {
   refresh();
 });
 
-async function boot() {
+async function boot(attempt = 0) {
   bindNetListeners();
   if (offline) setOffline(true);          // surface the standing banner if we booted offline
-  const session = await currentSession(client);
-  if (!session) { renderSignIn(app, async (email, pw) => { await signIn(client, email, pw); boot(); }); return; }
-  try { await refresh(); } catch { setOffline(!navigator.onLine); }   // don't let an offline fetch abort setup
-  navState = { view: "lists", listId: null };
-  try { history.replaceState({ gl: navState }, ""); } catch { /* ignore */ }
-  subscribeRealtime();
+  try {
+    // getSession + the first fetch can hang/fail on a flaky or away-from-home network at load.
+    const session = await currentSession(client);
+    if (!session) { renderSignIn(app, async (email, pw) => { await signIn(client, email, pw); boot(); }); return; }
+    await refresh();
+    navState = { view: "lists", listId: null };
+    try { history.replaceState({ gl: navState }, ""); } catch { /* ignore */ }
+    subscribeRealtime();
+  } catch (e) {
+    // Auto-retry with backoff instead of dead-ending on a manual reload; self-heals once the
+    // network returns (the online listener also re-fetches).
+    const loading = app.querySelector(".loading");
+    if (loading) loading.textContent = "Connecting…";
+    setOffline(!navigator.onLine);
+    setTimeout(() => boot(attempt + 1), Math.min(2000 * (attempt + 1), 8000));
+  }
 }
 boot();

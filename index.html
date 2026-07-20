@@ -93,10 +93,10 @@
       }
     }
     // If the app module still hasn't booted after a generous window (offline / CDN unreachable),
-    // replace the silent hang with a message. Cached CDN lib means this rarely fires now.
+    // replace the silent hang with a message. boot() auto-retries, so no manual reload is needed.
     setTimeout(() => {
       const el = document.querySelector("#app .loading");
-      if (el) el.textContent = "Can't reach the server — check your connection and reload.";
+      if (el) el.textContent = "Still connecting — check your connection…";
     }, 10000);
   </script>
 </body>

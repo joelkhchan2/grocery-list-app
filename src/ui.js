@@ -8,7 +8,7 @@ import { MEMBERS } from "../config.js";
 
 // Shown at the bottom of Settings so the loaded version is easy to confirm after a deploy.
 // KEEP IN SYNC with the SHELL constant in sw.js (bump both together on each release).
-export const APP_VERSION = "v50";
+export const APP_VERSION = "v51";
 
 // Tiny element helper. `text` is safe (textContent). Structural strings are author-controlled.
 // `on` is a map of event → handler; `dataset`/`style` are shallow-assigned; any other key is an attribute.
@@ -63,6 +63,10 @@ export function setMyStores(arr) { if (Array.isArray(arr)) MY_STORES = arr.slice
 export function getMyStores() { return MY_STORES.slice(); }
 const OTHER_STORES = ["Costco", "T&T", "Loblaws", "Metro", "Sobeys", "Longo's", "Farm Boy",
   "Fortinos", "Shoppers Drug Mart", "Adonis", "Btrust", "Bulk Barn", "Dollarama", "Whole Foods"];
+
+// Remember whether the "Done" (checked) group is expanded, so a re-render (e.g. after adding an
+// item) doesn't spring it back open after the user collapsed it. Per-device, session-lived.
+let doneGroupOpen = true;
 
 
 // Append collapsible <details> sections for pre-built groups to a container.
@@ -724,7 +728,10 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
       // item's box to un-check it back onto the list. Open by default.
       const body = el("div", { class: "store-group-body" });
       for (const item of done) body.append(buildItemRow(item, handlers));
-      listEl.append(el("details", { class: "store-group done-group", open: "" },
+      listEl.append(el("details", {
+        class: "store-group done-group", open: doneGroupOpen ? "" : null,
+        on: { toggle: (e) => { doneGroupOpen = e.currentTarget.open; } },
+      },
         el("summary", { class: "store-summary" },
           el("span", { text: `Done · ${done.length}` }),
           el("button", {
