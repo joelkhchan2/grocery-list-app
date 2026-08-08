@@ -20,6 +20,12 @@ let realtimeTimer = null;           // debounce for realtime-driven refreshes
 let netListenersBound = false;      // guards against re-adding window online/offline listeners on re-boot
 let navState = { view: "lists", listId: null };  // mirrors the current screen for history/back sync
 
+// TEMP: realtime debug logging. Logs channel status + every incoming change event to the
+// console so we can tell "socket never connected" from "connected but no events" (publication/RLS).
+// Flip to false (or delete) once live sync is confirmed working. Can also toggle at runtime with
+// `localStorage.rtDebug = "1"` / `delete localStorage.rtDebug`.
+const RT_DEBUG = true || localStorage.getItem("rtDebug") === "1";
+
 // Theme: apply saved prefs immediately (index.html already set data-theme pre-paint to avoid a flash;
 // this keeps the JS state in sync and reacts to system dark-mode changes when auto-dark is on).
 let prefs = loadPrefs();
@@ -473,18 +479,36 @@ const handlers = {
   onSignOut: async () => { await signOut(client); boot(); },
 };
 
-function subscribeRealtime() {
+async function subscribeRealtime() {
   client.removeAllChannels();       // drop any prior subscription so re-sign-in doesn't stack channels
+  // postgres_changes enforces RLS on the socket separately from REST writes. Our RLS is
+  // `auth.uid() in (household)`, so the socket MUST carry the signed-in user's JWT — otherwise
+  // auth.uid() is null server-side and every change event is filtered out (channel SUBSCRIBEs,
+  // but zero events arrive). supabase-js auto-propagation is version/timing-fragile, so set it
+  // explicitly before subscribing.
+  try {
+    const { data } = await client.auth.getSession();
+    const token = data.session && data.session.access_token;
+    if (token) await client.realtime.setAuth(token);
+  } catch { /* fall through: subscribe anyway; ensureFreshSession re-sets on reconnect */ }
   // Server-authoritative: any change refetches & replaces. Out-of-order events are inherently
   // safe (we always render the latest full fetch); own echoes are dropped via the pending set.
-  const onChange = (p) => { if (!isSelfEcho(p.new || p.old, pending)) scheduleRefresh(); };
+  const onChange = (p) => {
+    if (RT_DEBUG) console.log("[realtime] event", p.table, p.eventType, p.new || p.old);
+    if (!isSelfEcho(p.new || p.old, pending)) scheduleRefresh();
+  };
   client.channel("db-changes")
     .on("postgres_changes", { event: "*", schema: "public", table: "items" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "lists" }, onChange)
     // Deals only surface on the home view; ignore their (bulk, weekly) churn elsewhere.
     .on("postgres_changes", { event: "*", schema: "public", table: "deals" },
-      () => { if (state.view === "lists") scheduleRefresh(); })
-    .subscribe();
+      (p) => { if (RT_DEBUG) console.log("[realtime] deals", p.eventType); if (state.view === "lists") scheduleRefresh(); })
+    .subscribe((status, err) => {
+      // SUBSCRIBED = socket joined. If you see SUBSCRIBED but partner edits never log an
+      // "[realtime] event" line above, the table isn't in the supabase_realtime publication
+      // (or RLS is still filtering). CHANNEL_ERROR/TIMED_OUT = connection/config problem.
+      if (RT_DEBUG) console.log("[realtime] channel status:", status, err || "");
+    });
 }
 
 // Refresh the auth token when the app resumes or reconnects, if it's within ~2 min of expiry,
@@ -494,7 +518,11 @@ async function ensureFreshSession() {
     const { data } = await client.auth.getSession();
     const s = data.session;
     if (s && s.expires_at && s.expires_at * 1000 - Date.now() < 120000) {
-      await client.auth.refreshSession();
+      const { data: refreshed } = await client.auth.refreshSession();
+      // Hand the fresh token to the realtime socket too, so RLS keeps passing on the
+      // subscription after a token rotation (otherwise events silently stop post-refresh).
+      const token = refreshed && refreshed.session && refreshed.session.access_token;
+      if (token) await client.realtime.setAuth(token);
     }
   } catch { /* ignore — the write-path retry recovers a stale token on the next save */ }
 }
@@ -543,7 +571,7 @@ async function boot(attempt = 0) {
     await withTimeout(refresh(), 12000);
     navState = { view: "lists", listId: null };
     try { history.replaceState({ gl: navState }, ""); } catch { /* ignore */ }
-    subscribeRealtime();
+    await subscribeRealtime();
   } catch (e) {
     // Auto-retry with backoff instead of dead-ending on a manual reload; self-heals once the
     // network returns (the online listener also re-fetches).
