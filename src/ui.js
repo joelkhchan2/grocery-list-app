@@ -64,9 +64,12 @@ export function getMyStores() { return MY_STORES.slice(); }
 const OTHER_STORES = ["Costco", "T&T", "Loblaws", "Metro", "Sobeys", "Longo's", "Farm Boy",
   "Fortinos", "Shoppers Drug Mart", "Adonis", "Btrust", "Bulk Barn", "Dollarama", "Whole Foods"];
 
-// Remember whether the "Done" (checked) group is expanded, so a re-render (e.g. after adding an
-// item) doesn't spring it back open after the user collapsed it. Per-device, session-lived.
-let doneGroupOpen = true;
+// Remember whether the "Done" (checked) group is expanded. Defaults to COLLAPSED, and the
+// user's choice is persisted per-device (localStorage) so it survives reloads — expand it once
+// and it stays expanded; collapse it and it stays collapsed. A re-render (e.g. after adding an
+// item) reads the same state, so it never springs back to the default.
+let doneGroupOpen = false;
+try { doneGroupOpen = localStorage.getItem("glDoneOpen") === "1"; } catch { /* private mode */ }
 
 
 // Append collapsible <details> sections for pre-built groups to a container.
@@ -725,12 +728,16 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
 
     if (done.length) {
       // Collapsible: tap the header to show/hide checked items; tap a checked
-      // item's box to un-check it back onto the list. Open by default.
+      // item's box to un-check it back onto the list. Collapsed by default; the
+      // user's expand/collapse choice is remembered across reloads (glDoneOpen).
       const body = el("div", { class: "store-group-body" });
       for (const item of done) body.append(buildItemRow(item, handlers));
       listEl.append(el("details", {
         class: "store-group done-group", open: doneGroupOpen ? "" : null,
-        on: { toggle: (e) => { doneGroupOpen = e.currentTarget.open; } },
+        on: { toggle: (e) => {
+          doneGroupOpen = e.currentTarget.open;
+          try { localStorage.setItem("glDoneOpen", doneGroupOpen ? "1" : "0"); } catch { /* private mode */ }
+        } },
       },
         el("summary", { class: "store-summary" },
           el("span", { text: `Done · ${done.length}` }),
