@@ -6,6 +6,9 @@ on:
   schedule:
     - cron: "23 12 * * *"   # ~08:23 ET daily
   workflow_dispatch: {}
+permissions:
+  contents: read
+  actions: write   # lets the last step re-enable this workflow (GitHub auto-disables schedules after 60 idle days)
 jobs:
   ping:
     runs-on: ubuntu-latest
@@ -22,3 +25,10 @@ jobs:
           echo "keepalive ping -> HTTP $CODE"
           # 200 (RLS returns []) or 401/403 all count as activity; only fail on no response.
           [ -n "$CODE" ] && [ "$CODE" != "000" ]
+      # Best effort: re-assert "enabled" each run so GitHub's 60-day inactivity auto-disable is less
+      # likely to stick. Never fails the job. (Pushes to main also reset the inactivity clock.)
+      - name: Keep this workflow enabled
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow enable keepalive.yml --repo "$GITHUB_REPOSITORY" || true

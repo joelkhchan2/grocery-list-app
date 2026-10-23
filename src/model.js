@@ -19,3 +19,10 @@ export function watchNames(items) {
 // updated_at) simply fall through and trigger a harmless refetch.
 export function selfEchoKey(row) { return row ? `${row.id}@${row.updated_at}` : ""; }
 export function isSelfEcho(row, pending) { return !!row && pending.has(selfEchoKey(row)); }
+// A realtime refresh re-renders the screen, so it should only wait when that would destroy
+// in-progress input: a drag, or a text field with something typed in it. An EMPTY focused field
+// (the add-bar stays focused after every add so the keyboard stays up) is not busy — treating it
+// as busy starved refreshes for as long as the keyboard was open.
+export function shouldDeferRefresh({ dragging = false, typing = false, hasText = false } = {}) {
+  return !!dragging || (!!typing && !!hasText);
+}

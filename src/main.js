@@ -3,7 +3,7 @@ import { currentSession, signIn, signOut, renderSignIn } from "./auth.js";
 import * as db from "./db.js";
 import { renderLists, renderListDetail, renderDeals, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, showEmojiPicker, showItemEditor, setMyStores } from "./ui.js";
 import { loadPrefs, savePrefs, applyTheme, applyCustom, resolveActive } from "./theme.js";
-import { isSelfEcho, selfEchoKey, bySortOrder } from "./model.js";
+import { isSelfEcho, selfEchoKey, bySortOrder, shouldDeferRefresh } from "./model.js";
 import { emojiOf } from "./category.js";
 
 const app = document.getElementById("app");
@@ -17,6 +17,8 @@ let lastUsuals = [];                // cached "your usuals" so an optimistic re-
 let storeFilter = null;             // transient: filter list detail to one store (null = all)
 let refocusAddBar = false;          // after an add, keep the add-bar focused so the keyboard stays open
 let realtimeTimer = null;           // debounce for realtime-driven refreshes
+let realtimeOn = false;             // true once subscribeRealtime() has run (i.e. we're signed in)
+let everSubscribed = false;         // lets a RE-join (vs. the first) trigger a catch-up refetch
 let netListenersBound = false;      // guards against re-adding window online/offline listeners on re-boot
 let navState = { view: "lists", listId: null };  // mirrors the current screen for history/back sync
 
@@ -199,11 +201,16 @@ async function refresh() {
   }
 }
 
-// Don't clobber an active text input or an in-progress drag with a realtime refresh.
+// Don't clobber typed text or an in-progress drag with a realtime refresh. An EMPTY focused
+// input (e.g. the add-bar, kept focused after every add) doesn't count — see shouldDeferRefresh.
 function isBusy() {
   const a = document.activeElement;
-  const typing = a && app.contains(a) && (a.tagName === "INPUT" || a.tagName === "TEXTAREA");
-  return !!typing || !!document.querySelector(".row.dragging");
+  const typing = !!a && app.contains(a) && (a.tagName === "INPUT" || a.tagName === "TEXTAREA");
+  return shouldDeferRefresh({
+    dragging: !!document.querySelector(".row.dragging"),
+    typing,
+    hasText: typing && !!String(a.value || "").trim(),
+  });
 }
 // Coalesce bursts of realtime events (e.g. the weekly ~40-row deals rewrite) into one refresh,
 // and hold off while the user is mid-edit/drag.
@@ -211,6 +218,9 @@ function scheduleRefresh() {
   clearTimeout(realtimeTimer);
   realtimeTimer = setTimeout(() => {
     if (isBusy()) { scheduleRefresh(); return; }
+    // If the (empty) add-bar has focus, put it back after the re-render so the keyboard stays up.
+    const a = document.activeElement;
+    if (a && a.closest && a.closest(".addbar")) refocusAddBar = true;
     refresh();
   }, 300);
 }
@@ -480,6 +490,7 @@ const handlers = {
 };
 
 async function subscribeRealtime() {
+  realtimeOn = true;
   client.removeAllChannels();       // drop any prior subscription so re-sign-in doesn't stack channels
   // postgres_changes enforces RLS on the socket separately from REST writes. Our RLS is
   // `auth.uid() in (household)`, so the socket MUST carry the signed-in user's JWT — otherwise
@@ -504,6 +515,9 @@ async function subscribeRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "deals" },
       (p) => { if (RT_DEBUG) console.log("[realtime] deals", p.eventType); if (state.view === "lists") scheduleRefresh(); })
     .subscribe((status, err) => {
+      // Events missed while the socket was down are never replayed, so every RE-join (after a
+      // drop / backgrounding) re-fetches to catch up. The first join already has fresh data.
+      if (status === "SUBSCRIBED") { if (everSubscribed) scheduleRefresh(); everSubscribed = true; }
       // SUBSCRIBED = socket joined. If you see SUBSCRIBED but partner edits never log an
       // "[realtime] event" line above, the table isn't in the supabase_realtime publication
       // (or RLS is still filtering). CHANNEL_ERROR/TIMED_OUT = connection/config problem.
@@ -534,9 +548,15 @@ function bindNetListeners() {
   netListenersBound = true;
   window.addEventListener("online", () => { setOffline(false); ensureFreshSession(); refresh().catch(() => {}); });
   window.addEventListener("offline", () => setOffline(true));
-  // Mobile PWAs suspend in the background; refresh the token when the app comes back to the front.
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") ensureFreshSession();
+  // Mobile PWAs suspend in the background: the realtime socket usually dies and edits made in the
+  // meantime are never replayed. On return, refresh the token, rejoin the channel if it's no longer
+  // joined, and always re-fetch so the list is current instead of whatever it showed when we left.
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState !== "visible") return;
+    await ensureFreshSession();
+    if (!realtimeOn) return;
+    if (!client.getChannels().some((c) => c.state === "joined")) subscribeRealtime();
+    scheduleRefresh();
   });
 }
 

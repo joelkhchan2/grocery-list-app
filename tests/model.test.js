@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { bySortOrder, idsToClear, watchNames, isSelfEcho, selfEchoKey } from "../src/model.js";
 import { isNumericAmount, stepAmount } from "../src/model.js";
+import { shouldDeferRefresh } from "../src/model.js";
 
 test("bySortOrder sorts by sort_order then created_at", () => {
   const rows = [{sort_order:2,created_at:"b"},{sort_order:1,created_at:"a"},{sort_order:1,created_at:"z"}];
@@ -41,4 +42,12 @@ test("stepAmount steps integers (min 1) and leaves text amounts alone", () => {
   assert.equal(stepAmount("2", 1), "3");
   assert.equal(stepAmount("1", -1), "1");
   assert.equal(stepAmount("500 g", 1), "500 g");
+});
+
+test("shouldDeferRefresh waits for drags and typed text, not for an empty focused field", () => {
+  assert.equal(shouldDeferRefresh({ dragging: true }), true);                       // mid-drag → wait
+  assert.equal(shouldDeferRefresh({ typing: true, hasText: true }), true);          // text would be lost → wait
+  assert.equal(shouldDeferRefresh({ typing: true, hasText: false }), false);        // empty add-bar → refresh
+  assert.equal(shouldDeferRefresh({}), false);
+  assert.equal(shouldDeferRefresh(), false);
 });
