@@ -8,7 +8,7 @@ import { MEMBERS } from "../config.js";
 
 // Shown at the bottom of Settings so the loaded version is easy to confirm after a deploy.
 // KEEP IN SYNC with the SHELL constant in sw.js (bump both together on each release).
-export const APP_VERSION = "v55";
+export const APP_VERSION = "v56";
 
 // Tiny element helper. `text` is safe (textContent). Structural strings are author-controlled.
 // `on` is a map of event → handler; `dataset`/`style` are shallow-assigned; any other key is an attribute.
@@ -759,12 +759,6 @@ export function renderListDetail(mount, list, items, handlers, sortMode = "manua
   }));
 }
 
-// Leading per-item emoji — display-only (not a button) so it can't be mis-tapped beside the
-// checkbox/name. Change or remove an item's emoji from its ⋯ menu instead.
-function emojiLead(item) {
-  return el("span", { class: "item-emoji", "aria-hidden": "true", text: item.emoji });
-}
-
 // One swipe-to-delete row: .row → .row-main (100% wide) + .row-delete (revealed on left-swipe).
 function buildItemRow(item, handlers, opts = {}) {
   // Delete is immediate + undoable (the Undo bar restores it, watch flag included),
@@ -777,7 +771,6 @@ function buildItemRow(item, handlers, opts = {}) {
   // Done row: minimal — just checkbox + struck name (+ swipe delete). Tap the box to un-check.
   if (item.checked) {
     const doneName = el("div", { class: "name-line" });
-    if (item.emoji) doneName.append(el("span", { class: "item-emoji", text: item.emoji }));
     doneName.append(el("span", { class: "name", text: item.name }));
     const doneMain = el("div", { class: "row-main" },
       el("button", {
@@ -798,10 +791,9 @@ function buildItemRow(item, handlers, opts = {}) {
     on: { click: (e) => { e.stopPropagation(); handlers.onToggleCheck(item); } },
   }));
 
-  // Clean content: leading emoji + name + a muted quantity/unit; note as a sub-line only
+  // Clean content: name + a muted quantity/unit; note as a sub-line only
   // when set. Tapping this area opens the full item editor (all other fields live there).
   const nameLine = el("div", { class: "name-line" });
-  if (item.emoji) nameLine.append(emojiLead(item));
   nameLine.append(el("span", { class: "name", text: item.name }));
   const amt = item.amount == null ? "" : String(item.amount).trim();
   if (amt && (amt !== "1" || item.unit)) {
@@ -823,7 +815,7 @@ function buildItemRow(item, handlers, opts = {}) {
 }
 
 // Full item editor (opens on tapping a row). Consolidates every field that used to clutter
-// the row + the old ⋯ menu: name/emoji, quantity + unit (with steppers), note, store,
+// the row + the old ⋯ menu: name, quantity + unit (with steppers), note, store,
 // watch-for-deals + deal price, move-to-list, delete. Cancel/Save header; all fields commit
 // together via handlers.onSaveItem(item, patch). ctx (from main.js) supplies the move-to-list
 // context the editor can't know: { moveTargets:[{id,label}], onMove }. Reorder is drag-only.
@@ -833,16 +825,11 @@ export function showItemEditor(item, handlers, ctx = {}) {
   // any open .emoji-overlay — stack ON TOP of the editor instead of destroying it.
   const overlay = el("div", { class: "editor-overlay" });
   const s = {
-    emoji: item.emoji || null,
     store: item.store || null,
     watch: !!item.watch,
   };
 
   const nameInput = el("input", { type: "text", class: "prompt-input editor-name", value: item.name || "", "aria-label": "Item name" });
-  const emojiBtn = el("button", {
-    type: "button", class: s.emoji ? "emoji-btn" : "emoji-btn placeholder", text: s.emoji || "＋", "aria-label": "Change emoji",
-    on: { click: () => showEmojiPicker((em) => { s.emoji = em || null; emojiBtn.textContent = s.emoji || "＋"; emojiBtn.className = s.emoji ? "emoji-btn" : "emoji-btn placeholder"; }, s.emoji) },
-  });
 
   const qtyInput = el("input", { type: "text", inputmode: "numeric", class: "editor-input editor-qty", value: (item.amount != null ? String(item.amount) : ""), placeholder: "1", "aria-label": "Quantity" });
   // Unit: dropdown of common grocery measurements + a "Custom…" option that reveals a text field.
@@ -883,7 +870,6 @@ export function showItemEditor(item, handlers, ctx = {}) {
     const tp = priceInput.value.trim().replace(/[^0-9.]/g, "");
     const patch = {
       name: nameInput.value.trim() || item.name,
-      emoji: s.emoji,
       amount: qtyInput.value.trim() || "1",
       unit: (unitSelect.value === "__custom__" ? unitCustom.value.trim() : unitSelect.value) || null,
       note: noteInput.value.trim() || null,
@@ -899,7 +885,7 @@ export function showItemEditor(item, handlers, ctx = {}) {
     el("div", { class: "editor-header" },
       el("button", { type: "button", class: "editor-cancel", text: "Cancel", on: { click: () => overlay.remove() } }),
       el("button", { type: "button", class: "editor-save", text: "Save", on: { click: save } })),
-    el("div", { class: "editor-namerow" }, nameInput, emojiBtn),
+    el("div", { class: "editor-namerow" }, nameInput),
     el("div", { class: "editor-qtyrow" },
       el("div", { class: "editor-field grow" }, el("span", { class: "editor-label", text: "Quantity" }), qtyInput),
       el("div", { class: "editor-field grow" }, el("span", { class: "editor-label", text: "Unit" }), unitSelect),
@@ -965,7 +951,6 @@ function buildWatchRow(item, handlers) {
     },
   });
   const wNameLine = el("div", { class: "name-line" });
-  if (item.emoji) wNameLine.append(emojiLead(item));
   wNameLine.append(wName);
   const text = el("div", { class: "row-text" }, wNameLine);
 

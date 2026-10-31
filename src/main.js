@@ -1,10 +1,9 @@
 import { getClient } from "./supabase.js";
 import { currentSession, signIn, signOut, renderSignIn } from "./auth.js";
 import * as db from "./db.js";
-import { renderLists, renderListDetail, renderDeals, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, showEmojiPicker, showItemEditor, setMyStores } from "./ui.js";
+import { renderLists, renderListDetail, renderDeals, renderSuggestions, renderAppearance, showUndo, showSheet, showPrompt, showItemEditor, setMyStores } from "./ui.js";
 import { loadPrefs, savePrefs, applyTheme, applyCustom, resolveActive } from "./theme.js";
 import { isSelfEcho, selfEchoKey, bySortOrder, shouldDeferRefresh } from "./model.js";
-import { emojiOf } from "./category.js";
 
 const app = document.getElementById("app");
 const statusEl = document.getElementById("status");
@@ -262,7 +261,7 @@ const handlers = {
   onAddItem: (name) => {
     clearTimeout(addQueryTimer);
     refocusAddBar = true;                              // keep the keyboard up for the next item
-    mutate(() => db.addItem(client, state.listId, { name, amount: "1", note: null, emoji: emojiOf(name) }));
+    mutate(() => db.addItem(client, state.listId, { name, amount: "1", note: null }));
   },
   onNewWatchList: (name) => mutate(() => db.createList(client, { name, is_watchlist: true })),
   onAddWatchItem: (name) => {
@@ -270,7 +269,7 @@ const handlers = {
     if (!n) return;
     // A watch-list item is a standing watch: create it, then flag watch=true so it feeds the watcher.
     mutate(async () => {
-      const row = await db.addItem(client, state.listId, { name: n, amount: "1", note: null, emoji: emojiOf(n) });
+      const row = await db.addItem(client, state.listId, { name: n, amount: "1", note: null });
       return row && row.id ? db.updateItem(client, row.id, { watch: true }) : row;
     });
   },
@@ -291,7 +290,6 @@ const handlers = {
   onEditItem: (it, name) => mutate(() => db.updateItem(client, it.id, { name }), [it.id]),
   onEditNote: (it, note) => mutate(() => db.updateItem(client, it.id, { note }), [it.id]),
   onSetStore: (it, store) => mutate(() => db.updateItem(client, it.id, { store }), [it.id]),
-  onSetItemEmoji: (it, emoji) => mutate(() => db.updateItem(client, it.id, { emoji: emoji || null }), [it.id]),
   onSetTargetPrice: (it, raw) => {
     const s = (raw || "").trim();
     if (s === "") return mutate(() => db.updateItem(client, it.id, { target_price: null }), [it.id]);
@@ -341,9 +339,6 @@ const handlers = {
   onUseTemplate: (id) => mutate(() => db.useTemplate(client, id)),
   onItemMenu: (it) => {
     const opts = [{
-      label: it.emoji ? `${it.emoji} Change emoji` : "😊 Add emoji",
-      onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e), it.emoji),
-    }, {
       label: it.watch ? "Stop watching for deals" : "🔔 Watch for deals",
       onClick: () => handlers.onToggleWatch(it),
     }, {
@@ -372,8 +367,6 @@ const handlers = {
   },
   onWatchItemMenu: (it) => {
     const opts = [
-      { label: it.emoji ? `${it.emoji} Change emoji` : "😊 Add emoji",
-        onClick: () => showEmojiPicker((e) => handlers.onSetItemEmoji(it, e), it.emoji) },
       { label: it.watch ? "⏸ Pause alerts" : "▶ Resume alerts", onClick: () => handlers.onToggleWatch(it) },
       { label: it.target_price != null
           ? `🎯 Deal price: $${Number(it.target_price).toFixed(2)} (edit)`
@@ -456,7 +449,7 @@ const handlers = {
     clearTimeout(addQueryTimer);
     refocusAddBar = true;
     mutate(() => db.addItem(client, state.listId,
-      { name: row.name, amount: row.last_amount || "1", note: row.last_note || null, emoji: emojiOf(row.name) }));
+      { name: row.name, amount: row.last_amount || "1", note: row.last_note || null }));
   },
   onPickTheme: (key) => {
     prefs = { ...prefs, theme: key };
